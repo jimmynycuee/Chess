@@ -174,7 +174,7 @@ select {
   touch-action: none;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
 }
-.sq { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+.sq { position: relative; min-width: 0; min-height: 0; }
 .sq.l { background: var(--sq-light); }
 .sq.d { background: var(--sq-dark); }
 .sq.hl::before { content: ""; position: absolute; inset: 0; background: var(--hl); }
@@ -470,3 +470,8 @@ select {
 /* 教練框內容超出時，顯示看得見的捲軸 */
 .coach::-webkit-scrollbar { width: 8px; }
 .coach::-webkit-scrollbar-thumb { background: #55524e; border-radius: 4px; }
+
+.coach-head .switch { margin-left: auto; flex: 0 0 auto; }
+.coach-title { min-width: 0; }
+/* 棋子移動動畫 */
+.sq .pc.moving { z-index: 6; transition: transform 0.25s ease; }

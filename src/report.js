@@ -61,6 +61,94 @@ let playing = false; // 自動播放中
 let playTimer = null;
 let pausedAt = null; // 播放時停在哪個關鍵時刻
 const PLAY_DELAY = 1100;
+let pendingAnim = null; // 下一次畫棋盤時要播放的移動：[{ from, to }]
+let pendingSound = null; // 跟著動畫一起播放的音效（該步的 SAN）
+
+// ---------- 音效：直接載入 chess.com 的音效檔，載不到就用合成音 ----------
+
+const CHESSCOM_SOUNDS = 'https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/';
+const SOUND_FILES = { move: 'move-self', capture: 'capture', castle: 'castle', check: 'move-check', promote: 'promote' };
+const soundCache = {};
+const soundFailed = new Set();
+let audioCtx = null;
+
+function soundKind(san) {
+  if (san.includes('+') || san.includes('#')) return 'check';
+  if (san.startsWith('O-O')) return 'castle';
+  if (san.includes('=')) return 'promote';
+  if (san.includes('x')) return 'capture';
+  return 'move';
+}
+
+// 合成的備用音效：短促的「喀」聲，吃子較低沉、將軍較高。
+function synth(kind) {
+  try {
+    audioCtx ||= new AudioContext();
+    const t = audioCtx.currentTime;
+    const freq = { move: 520, capture: 300, castle: 440, check: 760, promote: 660 }[kind];
+    for (const [delay, f] of kind === 'castle' ? [[0, freq], [0.09, freq]] : [[0, freq]]) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = kind === 'capture' ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(f, t + delay);
+      osc.frequency.exponentialRampToValueAtTime(f * 0.6, t + delay + 0.08);
+      gain.gain.setValueAtTime(kind === 'capture' ? 0.35 : 0.22, t + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.12);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(t + delay);
+      osc.stop(t + delay + 0.13);
+    }
+  } catch {
+    // 沒有音效裝置時就安靜
+  }
+}
+
+function playMoveSound(san) {
+  if (!settings.soundOn || !san) return;
+  const kind = soundKind(san);
+  if (soundFailed.has(kind)) return synth(kind);
+  if (!soundCache[kind]) {
+    const a = new Audio(`${CHESSCOM_SOUNDS}${SOUND_FILES[kind]}.mp3`);
+    a.preload = 'auto';
+    a.addEventListener('error', () => soundFailed.add(kind));
+    soundCache[kind] = a;
+  }
+  const a = soundCache[kind].cloneNode();
+  a.volume = 0.8;
+  a.play().catch(() => {
+    soundFailed.add(kind);
+    synth(kind);
+  });
+}
+
+// 一步棋要滑動哪些子（王車易位時城堡也一起動）。
+function slidesFor(uci, reverse = false) {
+  const from = uci.slice(0, 2);
+  const to = uci.slice(2, 4);
+  const list = [{ from, to }];
+  const fileDiff = to.charCodeAt(0) - from.charCodeAt(0);
+  const rank = from[1];
+  if (Math.abs(fileDiff) === 2 && (from === 'e1' || from === 'e8')) {
+    list.push(fileDiff > 0 ? { from: `h${rank}`, to: `f${rank}` } : { from: `a${rank}`, to: `d${rank}` });
+  }
+  return reverse ? list.map((m) => ({ from: m.to, to: m.from })) : list;
+}
+
+function animate(slides) {
+  for (const { from, to } of slides) {
+    const img = document.querySelector(`#board [data-sq="${to}"] .pc`);
+    const src = document.querySelector(`#board [data-sq="${from}"]`);
+    if (!img || !src) continue;
+    const a = src.getBoundingClientRect();
+    const b = img.parentElement.getBoundingClientRect();
+    img.style.transform = `translate(${a.left - b.left}px, ${a.top - b.top}px)`;
+    img.classList.add('moving');
+    img.getBoundingClientRect(); // 先套用起點位置
+    img.style.transition = 'transform 0.25s ease';
+    img.style.transform = '';
+    img.addEventListener('transitionend', () => img.classList.remove('moving'), { once: true });
+  }
+}
 let engine = null;
 let oppEngine = null;
 let oppSkill = null;
@@ -319,6 +407,20 @@ function drawBoard({ fen, highlight = [], selected = null, targets = [], arrow =
   $('#board').innerHTML = html;
   $('#board').classList.toggle('interactive', !!boardFen());
   renderPlayers(fen);
+  if (pendingSound) {
+    playMoveSound(pendingSound);
+    pendingSound = null;
+  }
+  if (pendingAnim) {
+    const slides = pendingAnim;
+    pendingAnim = null;
+    // 先把子放在原來的格子（看起來沒動），下一個畫格再滑過去
+    for (const { to } of slides) {
+      const img = document.querySelector(`#board [data-sq="${to}"] .pc`);
+      if (img) img.style.transition = 'none';
+    }
+    animate(slides);
+  }
 }
 
 function arrowSvg(uci, color) {
@@ -653,11 +755,15 @@ async function opponentMove(ex) {
   if (!m) return;
   const step = pushStep(ex, m, uci, 'opp', source);
   await analyseStep(ex, step, ex.steps.length - 1);
+  if (explore === ex) {
+    pendingAnim = slidesFor(uci);
+    pendingSound = m.san;
+  }
 }
 
 async function exploreMove(m, uci) {
   // 一般復盤時走的正好是實戰的下一步，就直接沿著實戰前進
-  if (!explore && !lineView && sel < moves.length && results[sel].uci === uci) return select(sel + 1);
+  if (!explore && !lineView && sel < moves.length && results[sel].uci === uci) return select(sel + 1, false);
   if (lineView) {
     const lv = lineView;
     const fen = lv.fens[lv.idx];
@@ -706,6 +812,8 @@ function undoExplore() {
   }
   ex.redo.push(group);
   picked = null;
+  pendingAnim = group.flatMap((g) => slidesFor(g.step.uci, true)).reverse().slice(0, 2);
+  pendingSound = group.at(-1)?.step.san;
   if (!ex.steps.length && ex.kind === 'free' && !ex.redo.length) {
     const base = ex.base;
     leaveModes();
@@ -718,12 +826,15 @@ function undoExplore() {
 function redoExplore() {
   const ex = explore;
   if (!ex || ex.busy || !ex.redo.length) return;
-  for (const it of ex.redo.pop()) {
+  const group = ex.redo.pop();
+  for (const it of group) {
     ex.steps.push(it.step);
     ex.fens.push(it.fen);
     ex.evals[ex.fens.length - 1] = it.eval;
   }
   picked = null;
+  if (group.length === 1) pendingAnim = slidesFor(group[0].step.uci);
+  pendingSound = group.at(-1)?.step.san;
   render();
 }
 
@@ -939,6 +1050,7 @@ function tryMove(from, to) {
   if (!legal) return false;
   const uci = from + to + (legal.promotion ? 'q' : '');
   picked = null;
+  playMoveSound(legal.san);
   if (practice) checkAnswer(uci, legal.san);
   else exploreMove(legal, uci);
   return true;
@@ -1108,7 +1220,18 @@ function updateCursor() {
   }
 }
 
-function select(ply) {
+// animate：前進或後退一步時讓棋子滑動（拖曳走子時已經放好了，就不用再滑）
+function select(ply, animate = true) {
+  const target = Math.max(0, Math.min(moves.length, ply));
+  if (animate && !practice && !explore && !lineView) {
+    if (target === sel + 1) {
+      pendingAnim = slidesFor(results[sel].uci);
+      pendingSound = results[sel].san;
+    } else if (target === sel - 1 && sel > 0) {
+      pendingAnim = slidesFor(results[sel - 1].uci, true);
+      pendingSound = results[sel - 1].san;
+    }
+  }
   if (ply !== sel + 1 || !playing) pausedAt = pausedAt === ply ? pausedAt : null;
   sel = Math.max(0, Math.min(moves.length, ply));
   picked = null;
@@ -1495,7 +1618,15 @@ function nav(dir) {
   if (practice) return;
   if (lineView) {
     const to = { first: 0, prev: lineView.idx - 1, next: lineView.idx + 1, last: lineView.sans.length }[dir];
-    lineView.idx = Math.max(0, Math.min(lineView.sans.length, to));
+    const idx = Math.max(0, Math.min(lineView.sans.length, to));
+    if (idx === lineView.idx + 1) {
+      pendingAnim = slidesFor(lineView.moves[lineView.idx].uci);
+      pendingSound = lineView.sans[lineView.idx];
+    } else if (idx === lineView.idx - 1) {
+      pendingAnim = slidesFor(lineView.moves[idx].uci, true);
+      pendingSound = lineView.sans[idx];
+    }
+    lineView.idx = idx;
     picked = null;
     return render();
   }
@@ -1539,6 +1670,7 @@ document.addEventListener('keydown', (e) => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'sync') return;
   if (changes.pieceSet) settings.pieceSet = changes.pieceSet.newValue;
+  if (changes.soundOn) settings.soundOn = changes.soundOn.newValue;
   if (changes.reviewBestMove) {
     showBest = !!changes.reviewBestMove.newValue;
     $('#best-toggle').checked = showBest;

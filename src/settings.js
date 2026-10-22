@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS = {
   panelScale: 1,
   pieceSet: 'chesscom',
   autoOpenReport: false,
+  soundOn: true,
 };
 
 // 賽後預先分析的鍵值（content.js 裡有一份相同的算法）。

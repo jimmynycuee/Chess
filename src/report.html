@@ -19,7 +19,6 @@
         <button data-me="w">白方</button>
         <button data-me="b">黑方</button>
       </div>
-      <label class="switch" title="一直顯示 Best Move（會記住）"><input type="checkbox" id="best-toggle"><span class="knob"></span>Best Move</label>
       <button id="flip" class="ghost" title="翻轉棋盤">翻轉棋盤</button>
       <button id="copy" class="ghost" disabled>複製摘要</button>
       <button id="pgn" class="ghost" disabled>匯出 PGN</button>
@@ -52,7 +51,11 @@
       <div class="tab-body">
         <div class="tab" data-tab="review">
           <div class="coach" id="coach">
-            <div class="coach-head"><span class="coach-avatar">♞</span><div id="coach-title" class="coach-title"></div></div>
+            <div class="coach-head">
+              <span class="coach-avatar">♞</span>
+              <div id="coach-title" class="coach-title"></div>
+              <label class="switch" title="一直顯示 Best Move（會記住）"><input type="checkbox" id="best-toggle"><span class="knob"></span>Best Move</label>
+            </div>
             <div id="coach-body" class="coach-body"></div>
           </div>
           <div id="chart" class="chart"></div>

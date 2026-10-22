@@ -1,7 +1,7 @@
 import { loadSettings } from './settings.js';
 
 const s = await loadSettings();
-for (const key of ['enabled', 'showBestMove', 'reviewBestMove', 'showArrow', 'autoOpenReport']) {
+for (const key of ['enabled', 'showBestMove', 'reviewBestMove', 'showArrow', 'autoOpenReport', 'soundOn']) {
   const el = document.getElementById(key);
   el.checked = s[key];
   el.addEventListener('change', () => chrome.storage.sync.set({ [key]: el.checked }));
