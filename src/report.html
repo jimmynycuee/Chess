@@ -100,8 +100,14 @@
       </div>
 
       <footer class="controls">
-        <button data-nav="prev" title="上一步（←）">◀</button>
-        <button data-nav="next" title="下一步（→）">▶</button>
+        <button data-nav="first" title="開頭（Home）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14" /><path d="M18 6l-7 6 7 6" /></svg></button>
+        <button data-nav="prev" title="上一步（←）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button>
+        <button id="play" title="播放：遇到關鍵時刻會停下來（空白鍵）">
+          <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z" class="fill" /></svg>
+          <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" /></svg>
+        </button>
+        <button data-nav="next" title="下一步（→）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
+        <button data-nav="last" title="最後（End）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v14" /><path d="M6 6l7 6-7 6" /></svg></button>
       </footer>
     </aside>
   </main>

@@ -57,6 +57,10 @@ let explore = null; // 變化模式：free 試走、replay 重新下、drill 開
 let lineView = null; // 看主線
 let picked = null; // 目前選取（或拖曳中）的棋子所在格
 let showBest = !!settings.reviewBestMove; // Best Move 常設開關（會記住）
+let playing = false; // 自動播放中
+let playTimer = null;
+let pausedAt = null; // 播放時停在哪個關鍵時刻
+const PLAY_DELAY = 1100;
 let engine = null;
 let oppEngine = null;
 let oppSkill = null;
@@ -443,6 +447,9 @@ function renderReview() {
   const bookName = opening.bookPlies.has(played.ply) ? openingTable[posKey(fens[sel])]?.[1] : null;
   let html = `<div class="line">${sideName(played.color)}勝率 ${moverWin(played.winBeforeW, played.color).toFixed(0)}% → ${moverWin(played.winAfterW, played.color).toFixed(0)}%
     <span class="muted">（Eval ${formatScore(evals[sel].score)}）</span></div>`;
+  if (pausedAt === sel) {
+    html = `<div class="feedback info key-stop">關鍵時刻：${played.missed ? '對手剛下錯，你沒有抓住機會。' : '這是你這盤的關鍵錯誤。'}看完說明後按播放鍵繼續。</div>` + html;
+  }
   if (bookName) html += `<div class="muted small">Book：${escapeHtml(bookName)}</div>`;
   if (played.missed) html += `<div class="line">${missedTag} 對手上一步下錯了，這裡有機會反擊。</div>`;
   if (played.why.length) html += `<ul class="why">${played.why.map((t) => `<li>${escapeHtml(pov(t, played.color))}</li>`).join('')}</ul>`;
@@ -536,6 +543,7 @@ function solve(uci, feedback, showAnswerArrow = false, fenAfter = null) {
 // ---------- 變化模式：試走、重新下、開局練習 ----------
 
 function leaveModes() {
+  stopPlay();
   practice = null;
   explore = null;
   lineView = null;
@@ -1101,6 +1109,7 @@ function updateCursor() {
 }
 
 function select(ply) {
+  if (ply !== sel + 1 || !playing) pausedAt = pausedAt === ply ? pausedAt : null;
   sel = Math.max(0, Math.min(moves.length, ply));
   picked = null;
   render();
@@ -1434,7 +1443,55 @@ $('#me-toggle').addEventListener('click', async (e) => {
   renderAll();
 });
 
+// ---------- 自動播放：遇到你的關鍵錯誤或錯失的機會就停下來 ----------
+
+function isKeyMoment(ply) {
+  const r = results[ply - 1];
+  return !!r && r.color === me && (r.loss >= LESSON_LOSS || r.missed);
+}
+
+function updatePlayButton() {
+  $('#play').classList.toggle('playing', playing);
+  $('#play').title = playing ? '暫停（空白鍵）' : '播放：遇到關鍵時刻會停下來（空白鍵）';
+}
+
+function stopPlay() {
+  playing = false;
+  clearTimeout(playTimer);
+  if ($('#play')) updatePlayButton();
+}
+
+function tick() {
+  if (!playing) return;
+  if (sel >= moves.length) return stopPlay();
+  pausedAt = null;
+  select(sel + 1);
+  if (isKeyMoment(sel)) {
+    pausedAt = sel;
+    stopPlay();
+    render();
+    return;
+  }
+  playTimer = setTimeout(tick, PLAY_DELAY);
+}
+
+function togglePlay() {
+  if (playing) return stopPlay();
+  if (practice || explore || lineView) {
+    leaveModes();
+    render();
+  }
+  setTab('review');
+  if (sel >= moves.length) select(0);
+  playing = true;
+  updatePlayButton();
+  // 剛從關鍵時刻繼續時馬上走下一步，其他情況稍等一下再開始
+  playTimer = setTimeout(tick, pausedAt === sel ? 0 : 400);
+}
+
 function nav(dir) {
+  stopPlay();
+  pausedAt = null;
   if (practice) return;
   if (lineView) {
     const to = { first: 0, prev: lineView.idx - 1, next: lineView.idx + 1, last: lineView.sans.length }[dir];
@@ -1445,6 +1502,8 @@ function nav(dir) {
   if (explore) {
     if (dir === 'prev') undoExplore();
     if (dir === 'next') redoExplore();
+    if (dir === 'first') while (explore?.steps.length && !explore.busy) undoExplore();
+    if (dir === 'last') while (explore?.redo.length && !explore.busy) redoExplore();
     return;
   }
   select({ first: 0, prev: sel - 1, next: sel + 1, last: moves.length }[dir]);
@@ -1454,6 +1513,7 @@ $('.controls').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-nav]');
   if (b) nav(b.dataset.nav);
 });
+$('#play').addEventListener('click', togglePlay);
 $('#flip').addEventListener('click', () => {
   flipped = !flipped;
   render();
@@ -1470,6 +1530,10 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight') nav('next');
   if (e.key === 'Home') nav('first');
   if (e.key === 'End') nav('last');
+  if (e.key === ' ') {
+    e.preventDefault();
+    togglePlay();
+  }
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
