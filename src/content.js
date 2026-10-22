@@ -302,11 +302,11 @@
     const [x1, y1] = center(uci.slice(0, 2));
     const [x2, y2] = center(uci.slice(2, 4));
     const len = Math.hypot(x2 - x1, y2 - y1);
-    const ex = x2 - ((x2 - x1) / len) * 3.2;
-    const ey = y2 - ((y2 - y1) / len) * 3.2;
+    const ex = x2 - ((x2 - x1) / len) * 2.4;
+    const ey = y2 - ((y2 - y1) / len) * 2.4;
     svg.innerHTML = `
-      <defs><marker id="crb-head" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
-        <path d="M0,0 L4,2 L0,4 z" fill="rgba(40,140,255,0.85)"/></marker></defs>
+      <defs><marker id="crb-head" markerWidth="3" markerHeight="3" refX="1.2" refY="1.5" orient="auto">
+        <path d="M0,0 L3,1.5 L0,3 z" fill="rgba(40,140,255,0.85)"/></marker></defs>
       <line x1="${x1}" y1="${y1}" x2="${ex}" y2="${ey}" stroke="rgba(40,140,255,0.85)" stroke-width="2.2"
         stroke-linecap="round" marker-end="url(#crb-head)"/>`;
   }

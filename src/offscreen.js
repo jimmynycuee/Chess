@@ -59,7 +59,7 @@ async function live({ sans, depth }) {
         explainBest({ fenBefore: prevFen, before, mover: ev.color, playedAfter: cur.score })?.reasons[0] || null;
     }
     if (['inaccuracy', 'mistake', 'blunder'].includes(ev.cls)) {
-      ev.why = explainMistake({ fenBefore: prevFen, uci: ev.uci, after: cur, mover: ev.color })[0] || null;
+      ev.why = explainMistake({ fenBefore: prevFen, uci: ev.uci, after: cur, mover: ev.color })[0]?.text || null;
     }
     result.last = ev;
   }

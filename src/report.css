@@ -199,3 +199,49 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .moves .mv.mine { font-weight: 600; }
 
 .better { display: grid; gap: 4px; margin-top: 6px; padding: 8px 10px; border-left: 3px solid #3ba55d; background: var(--bg); border-radius: 4px; }
+
+/* 對局故事 */
+.story p { margin: 0 0 6px; }
+.story p:last-child { margin-bottom: 0; font-weight: 600; }
+
+/* 三階段 */
+.phases { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.phase { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; }
+.phase.empty { cursor: default; opacity: 0.7; }
+.phase.weak { border-color: #e58f2a; }
+.phase-name { font-weight: 600; display: flex; gap: 6px; align-items: center; }
+.phase-acc { font-size: 28px; font-weight: 700; }
+.phase-acc small { font-size: 12px; font-weight: 400; color: var(--muted); }
+.tag.warn { background: #e58f2a; }
+.tag.good { background: var(--accent); }
+
+/* 好棋 */
+.goods { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.goods li[data-ply] { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.goods li[data-ply]:hover b { text-decoration: underline; }
+.good-icon { font-size: 20px; line-height: 1.2; }
+
+/* 錯誤統計 */
+#stats h3 { font-size: 13px; margin: 0 0 6px; color: var(--muted); }
+#stats h3:not(:first-child) { margin-top: 14px; }
+.stat-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.stat-list li { display: grid; grid-template-columns: 1fr auto; gap: 4px; }
+.stat-list li > div { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.stat-count { font-weight: 700; }
+.chip { padding: 0 8px; font-size: 12px; border-radius: 10px; }
+
+/* 練習建議 */
+.suggest-list { display: grid; gap: 8px; }
+.suggest {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--fg);
+  text-decoration: none;
+}
+.suggest:hover { border-color: var(--accent); }
+
+/* 走勢圖上的階段標籤 */
+.phase-label { position: absolute; top: 4px; transform: translateX(4px); font-size: 11px; color: #cfccc8; pointer-events: none; }

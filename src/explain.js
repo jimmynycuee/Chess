@@ -99,7 +99,28 @@ function mateFor(score, color) {
   return (forWhite ? 'w' : 'b') === color ? Math.abs(score.mate) : null;
 }
 
-// 為什麼這步不好。before/after 為引擎分析（白方視角），mover 為走子方。
+const R = (type, text) => ({ type, text });
+
+// 錯誤類型的中文名稱（賽後統計用）。
+export const MISTAKE_TYPES = {
+  mated: '讓對手有殺棋',
+  hang: '子沒保護好、被吃',
+  fork: '被對手捉雙',
+  threat: '漏看對手的威脅',
+  material: '交換後吃虧',
+  positional: '局面變差（沒有立即戰術）',
+};
+
+// 這步是不是棄子：走到會被白白吃掉的格子，而且不是吃了更值錢的子。
+export function isSacrifice(fenBefore, uci) {
+  const chess = new Chess(fenBefore);
+  const m = uciMove(chess, uci);
+  if (!m || m.piece === 'p' || m.piece === 'k') return false;
+  if (m.captured && VAL[m.captured] >= VAL[m.piece]) return false;
+  return isHanging(chess, m.to);
+}
+
+// 為什麼這步不好。回傳 [{ type, text }]。before/after 為引擎分析（白方視角），mover 為走子方。
 export function explainMistake({ fenBefore, uci, after, mover }) {
   const reasons = [];
   const chess = new Chess(fenBefore);
@@ -109,18 +130,18 @@ export function explainMistake({ fenBefore, uci, after, mover }) {
 
   const mateAgainst = mateFor(after.score, opp(mover));
   if (mateAgainst) {
-    const line = sanLine(fenAfter, after.pv, mateAgainst * 2 - 1);
-    reasons.push(mateAgainst === 1 ? `這步讓對手可以直接將死你（${line}）。` : `這步之後對手有 ${mateAgainst} 步殺：${line}。`);
+    const line = sanLine(fenAfter, after.pv, Math.min(mateAgainst * 2 - 1, 5)) + (mateAgainst > 3 ? ' …' : '');
+    reasons.push(R('mated', mateAgainst === 1 ? `這步讓對手可以直接將死你（${line}）。` : `這步之後對手有 ${mateAgainst} 步殺：${line}。`));
     return reasons;
   }
 
   if (isHanging(chess, played.to)) {
-    reasons.push(`你把${NAME[played.piece]}走到 ${played.to}，那裡保護不夠，會被對手吃掉。`);
+    reasons.push(R('hang', `你把${NAME[played.piece]}走到 ${played.to}，那裡保護不夠，會被對手吃掉。`));
   } else {
     const before = new Chess(fenBefore);
     const wasHanging = new Set(hangingPieces(before, mover).map((p) => p.square));
     const newly = hangingPieces(chess, mover).filter((p) => !wasHanging.has(p.square));
-    if (newly.length) reasons.push(`這步之後你的${list(newly.slice(0, 2))}變得沒有保護。`);
+    if (newly.length) reasons.push(R('hang', `這步之後你的${list(newly.slice(0, 2))}變得沒有保護。`));
   }
 
   const reply = after.pv?.[0];
@@ -130,13 +151,13 @@ export function explainMistake({ fenBefore, uci, after, mover }) {
     if (m) {
       const targets = forkTargets(c2, m.to);
       if (targets.length >= 2) {
-        reasons.push(`對手可以走 ${m.san}，用${NAME[m.piece]}同時攻擊你的${list(targets.slice(0, 2))}（捉雙）。`);
+        reasons.push(R('fork', `對手可以走 ${m.san}，用${NAME[m.piece]}同時攻擊你的${list(targets.slice(0, 2))}（捉雙）。`));
       } else if (m.captured && !reasons.length) {
-        reasons.push(`對手可以走 ${m.san} 吃掉你的${NAME[m.captured]}。`);
+        reasons.push(R('hang', `對手可以走 ${m.san} 吃掉你的${NAME[m.captured]}。`));
       } else if (!reasons.length) {
         const already = new Set(hangingPieces(new Chess(fenAfter), mover).map((p) => p.square));
         const threatened = hangingPieces(c2, mover).filter((p) => !already.has(p.square));
-        if (threatened.length) reasons.push(`對手可以走 ${m.san}，攻擊你的${list(threatened.slice(0, 2))}。`);
+        if (threatened.length) reasons.push(R('threat', `對手可以走 ${m.san}，攻擊你的${list(threatened.slice(0, 2))}。`));
       }
     }
   }
@@ -144,11 +165,11 @@ export function explainMistake({ fenBefore, uci, after, mover }) {
   if (!mateAgainst && after.pv?.length) {
     const swing = materialSwing(fenAfter, after.pv, mover);
     if (swing <= -2 && reasons.length < 2) {
-      reasons.push(`照最好的應對下去，你會少掉約 ${-swing} 分子力（${sanLine(fenAfter, after.pv)}）。`);
+      reasons.push(R('material', `照最好的應對下去，你會少掉約 ${-swing} 分子力（${sanLine(fenAfter, after.pv)}）。`));
     }
   }
   if (!reasons.length && reply) {
-    reasons.push(`對手最好的應對是 ${sanLine(fenAfter, [reply], 1)}，之後你的局面會變差。`);
+    reasons.push(R('positional', `對手最好的應對是 ${sanLine(fenAfter, [reply], 1)}，之後你的局面會變差。`));
   }
   return reasons;
 }

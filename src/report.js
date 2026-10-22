@@ -8,15 +8,27 @@ import {
   formatScore,
   uciLineToSan,
   gameAccuracy,
+  classifyMove,
   CLASSES,
 } from './analysis.js';
 import { explainMistake, explainBest } from './explain.js';
+import {
+  openingInfo,
+  phaseOf,
+  phaseStats,
+  PHASES,
+  goodMoves,
+  mistakeStats,
+  suggestions,
+  buildStory,
+} from './insights.js';
 
 const COUNTED = ['best', 'excellent', 'good', 'book', 'inaccuracy', 'mistake', 'blunder'];
 const BAD = ['inaccuracy', 'mistake', 'blunder'];
 const LESSON_LOSS = 8; // 自己這步勝率掉超過這個值，才算一課
 const OPP_MISTAKE_LOSS = 10; // 對手這步勝率掉超過這個值，才算「可以利用的機會」
 const PRACTICE_OK_LOSS = 3; // 練習時，比最佳著法只差這麼多也算答對
+const ANALYSIS_VERSION = 2; // 分析格式改變時遞增，讓舊的快取重新分析
 const $ = (sel) => document.querySelector(sel);
 
 const id = new URLSearchParams(location.search).get('id');
@@ -47,26 +59,40 @@ function getEngine() {
 }
 
 async function analyseGame() {
-  if (game.analysis?.depth === settings.reportDepth && game.analysis.evals.length === fens.length) {
+  const a = game.analysis;
+  if (a?.v === ANALYSIS_VERSION && a.depth === settings.reportDepth && a.evals.length === fens.length) {
     return game.analysis.evals;
   }
   const evals = [];
   for (let i = 0; i < fens.length; i++) {
     $('.progress-text').textContent = `Stockfish 分析中… ${i}/${fens.length - 1}（深度 ${settings.reportDepth}）`;
     $('.progress-bar').style.width = `${(i / (fens.length - 1 || 1)) * 100}%`;
-    evals.push(await getEngine().analyse(fens[i], { depth: settings.reportDepth }));
+    // 多算第二好的走法，用來找「唯一好棋」
+    evals.push(await getEngine().analyse(fens[i], { depth: settings.reportDepth, multipv: 2 }));
   }
-  game.analysis = { depth: settings.reportDepth, evals };
+  game.analysis = { v: ANALYSIS_VERSION, depth: settings.reportDepth, evals };
   await chrome.storage.local.set({ [id]: game });
   return evals;
 }
 
+const openingTable = await fetch(chrome.runtime.getURL('vendor/openings.json')).then((r) => r.json());
+const opening = openingInfo(fens, openingTable);
 const evals = await analyseGame();
 const winW = evals.map((e) => whiteWinPercent(e.score));
 const results = moves.map((move, i) => {
   const ev = evaluateMove({ before: evals[i], after: evals[i + 1], move, ply: i + 1 });
   ev.bestPv = uciLineToSan(fens[i], evals[i].pv.length ? evals[i].pv : [evals[i].bestmove || ''], 5);
-  ev.why = BAD.includes(ev.cls) ? explainMistake({ fenBefore: fens[i], uci: ev.uci, after: evals[i + 1], mover: ev.color }) : [];
+  // 開局庫裡的著法標成「開局」；不在庫裡的就照勝率損失重新分類。
+  if (opening.bookPlies.has(ev.ply)) {
+    if (!BAD.includes(ev.cls)) ev.cls = 'book';
+  } else if (ev.cls === 'book') {
+    ev.cls = classifyMove(ev.loss, ev.uci === ev.bestUci, Infinity);
+  }
+  const reasons = BAD.includes(ev.cls)
+    ? explainMistake({ fenBefore: fens[i], uci: ev.uci, after: evals[i + 1], mover: ev.color })
+    : [];
+  ev.why = reasons.map((x) => x.text);
+  ev.whyTypes = reasons.map((x) => x.type);
   ev.better =
     ev.cls !== 'best'
       ? explainBest({ fenBefore: fens[i], before: evals[i], mover: ev.color, playedAfter: evals[i + 1].score })
@@ -78,6 +104,8 @@ results.forEach((r, i) => {
   const prev = results[i - 1];
   r.missed = !!prev && prev.loss >= OPP_MISTAKE_LOSS && r.loss >= LESSON_LOSS;
 });
+
+const phases = phaseOf(results, fens);
 
 $('#progress').hidden = true;
 $('#main').hidden = false;
@@ -136,6 +164,102 @@ function renderCards() {
   };
   $('#cards').innerHTML = card(me) + card(me === 'w' ? 'b' : 'w');
 }
+
+// ---------- 對局故事 ----------
+
+function renderStory() {
+  const lines = buildStory({ results, winW, evals, me, opening, result: game.result });
+  $('#story').innerHTML = lines.map((t) => `<p>${escapeHtml(t)}</p>`).join('');
+}
+
+// ---------- 三階段表現 ----------
+
+function renderPhases() {
+  const mine = phaseStats(results, phases, me);
+  const theirs = phaseStats(results, phases, me === 'w' ? 'b' : 'w');
+  $('#phases').innerHTML = Object.entries(PHASES)
+    .map(([key, name]) => {
+      const s = mine.stats[key];
+      const o = theirs.stats[key];
+      if (!s.n) return `<div class="phase empty"><div class="phase-name">${name}</div><div class="muted">這盤沒有走到${name}</div></div>`;
+      const weakest = mine.weakest === key;
+      return `<div class="phase ${weakest ? 'weak' : ''}" ${s.worst ? `data-ply="${s.worst.ply}"` : ''}>
+        <div class="phase-name">${name} ${weakest ? '<span class="tag warn">最需要加強</span>' : ''}</div>
+        <div class="phase-acc">${s.acc.toFixed(0)}<small> 準確率</small></div>
+        <div class="muted small">你走了 ${s.n} 步，${s.bad ? `有 ${s.bad} 步不精確以上` : '沒有明顯失誤'}</div>
+        <div class="muted small">對手：${o.acc === null ? '–' : o.acc.toFixed(0)}</div>
+      </div>`;
+    })
+    .join('');
+}
+
+$('#phases').addEventListener('click', (e) => {
+  const el = e.target.closest('[data-ply]');
+  if (el) {
+    practice = null;
+    select(Number(el.dataset.ply));
+  }
+});
+
+// ---------- 你下得好的地方 ----------
+
+function renderGoods() {
+  const goods = goodMoves({ results, evals, fens, me, oppMistakeLoss: OPP_MISTAKE_LOSS });
+  const icon = { only: '🎯', punish: '⚡', sac: '💎' };
+  $('#goods').innerHTML = goods.length
+    ? goods
+        .map(
+          (g) => `<li data-ply="${g.ply}"><span class="good-icon">${icon[g.kind]}</span>
+            <div><b>${escapeHtml(moveLabel(results[g.ply - 1]))}</b> <span class="tag good">${g.title}</span>
+            <div class="muted small">${escapeHtml(g.text)}</div></div></li>`
+        )
+        .join('')
+    : '<li class="muted">這盤沒有特別突出的好棋。下次試著多留意對手的失誤，抓住了就會出現在這裡！</li>';
+}
+
+$('#goods').addEventListener('click', (e) => {
+  const li = e.target.closest('li[data-ply]');
+  if (li) {
+    practice = null;
+    select(Number(li.dataset.ply));
+  }
+});
+
+// ---------- 錯誤統計與練習建議 ----------
+
+function renderStats() {
+  const st = mistakeStats(results, me);
+  const chips = (plies) =>
+    plies.map((p) => `<button class="chip" data-ply="${p}">${escapeHtml(moveLabel(results[p - 1]))}</button>`).join('');
+  const block = (title, list, empty) =>
+    `<h3>${title}</h3>` +
+    (list.length
+      ? `<ul class="stat-list">${list
+          .map((x) => `<li><span class="stat-name">${x.name}</span><span class="stat-count">${x.plies.length} 次</span><div>${chips(x.plies)}</div></li>`)
+          .join('')}</ul>`
+      : `<p class="muted small">${empty}</p>`);
+  $('#stats').innerHTML =
+    block('你犯的錯', st.types, '這盤沒有不精確以上的錯誤。') + block('你漏看的機會', st.missed, '這盤沒有漏看明顯的戰術。');
+
+  const sug = suggestions({ stats: st, phase: phaseStats(results, phases, me), opening });
+  $('#suggest').innerHTML = sug.length
+    ? sug
+        .map(
+          (x) => `<a class="suggest" href="${x.url}" target="_blank" rel="noopener">
+            <b>${escapeHtml(x.title)} ↗</b><span class="muted small">${escapeHtml(x.why)}</span></a>`
+        )
+        .join('')
+    : '<p class="muted small">這盤下得很穩，繼續保持！</p>';
+}
+
+$('#stats').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip[data-ply]');
+  if (chip) {
+    practice = null;
+    select(Number(chip.dataset.ply));
+    $('#board-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+});
 
 // ---------- 本局三課 ----------
 
@@ -222,6 +346,15 @@ function renderChart() {
   const x = (i) => (i / n) * W;
   const y = (p) => 6 + (1 - p / 100) * (H - 12);
   const pts = winW.map((p, i) => `${x(i).toFixed(1)},${y(p).toFixed(1)}`).join(' ');
+  // 階段分界：某一步的階段和前一步不同，就在那步之前畫一條線
+  const phaseLines = [];
+  phases.forEach((p, i) => {
+    if (i > 0 && p !== phases[i - 1]) phaseLines.push(i);
+  });
+  const starts = [0, ...phaseLines];
+  const phaseLabels = starts
+    .map((i) => `<span class="phase-label" style="left:${(x(i) / W) * 100}%">${PHASES[phases[i]]}</span>`)
+    .join('');
   const marks = results
     .filter((r) => BAD.includes(r.cls))
     .map(
@@ -236,8 +369,10 @@ function renderChart() {
       <line x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}" stroke="#8a8783" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
       <line class="cursor" x1="${x(sel)}" x2="${x(sel)}" y1="0" y2="${H}" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/>
       <line class="hover" x1="-10" x2="-10" y1="0" y2="${H}" stroke="#8a8783" vector-effect="non-scaling-stroke"/>
+      ${phaseLines.map((i) => `<line x1="${x(i)}" x2="${x(i)}" y1="0" y2="${H}" stroke="#8a8783" stroke-width="1" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>`).join('')}
       ${marks}
     </svg>
+    ${phaseLabels}
     <div class="tooltip" hidden></div>`;
 
   const svg = $('#chart svg');
@@ -316,10 +451,10 @@ function arrowSvg(uci, color) {
   const [x1, y1] = c(uci.slice(0, 2));
   const [x2, y2] = c(uci.slice(2, 4));
   const len = Math.hypot(x2 - x1, y2 - y1);
-  const ex = x2 - ((x2 - x1) / len) * 3.2;
-  const ey = y2 - ((y2 - y1) / len) * 3.2;
-  return `<svg viewBox="0 0 100 100"><defs><marker id="ah" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
-    <path d="M0,0 L4,2 L0,4 z" fill="${color}"/></marker></defs>
+  const ex = x2 - ((x2 - x1) / len) * 2.4;
+  const ey = y2 - ((y2 - y1) / len) * 2.4;
+  return `<svg viewBox="0 0 100 100"><defs><marker id="ah" markerWidth="3" markerHeight="3" refX="1.2" refY="1.5" orient="auto">
+    <path d="M0,0 L3,1.5 L0,3 z" fill="${color}"/></marker></defs>
     <line x1="${x1}" y1="${y1}" x2="${ex}" y2="${ey}" stroke="${color}" stroke-opacity="0.85" stroke-width="2.2" stroke-linecap="round" marker-end="url(#ah)"/></svg>`;
 }
 
@@ -557,8 +692,12 @@ function buildSummary() {
     const why = r.missed ? `錯失良機，${r.why[0] || ''}` : r.why[0] || '';
     return `${i + 1}. ${moveLabel(r)}（${CLASSES[r.cls].label}）${why} ${r.better ? `→ 更好：${r.better.san}` : ''}`;
   });
+  const ph = phaseStats(results, phases, me);
   return [
     `♞ ${game.white} vs ${game.black}  ${game.result}`,
+    ...(opening.name ? [`開局：${opening.zh || opening.name}（${opening.eco}）`] : []),
+    ...buildStory({ results, winW, evals, me, opening, result: game.result }).filter((t) => !t.startsWith('這盤下的是')),
+    ...(ph.weakest ? [`最需要加強：${PHASES[ph.weakest]}（準確率 ${ph.stats[ph.weakest].acc.toFixed(0)}）`] : []),
     `我（${playerName(me)}，${me === 'w' ? '白' : '黑'}）準確率 ${s.acc?.toFixed(1) ?? '–'}｜不精確 ${s.counts.inaccuracy}、失誤 ${s.counts.mistake}、大失誤 ${s.counts.blunder}、錯失良機 ${s.missed}`,
     lessons.length ? '本局三課：' : '本局沒有明顯失誤 👍',
     ...lessons,
@@ -611,7 +750,11 @@ document.addEventListener('keydown', (e) => {
 function renderAll() {
   document.querySelectorAll('#me-toggle button').forEach((b) => b.classList.toggle('on', b.dataset.me === me));
   renderCards();
+  renderStory();
+  renderPhases();
+  renderGoods();
   renderLessons();
+  renderStats();
   renderOpp();
   renderChart();
   renderMoves();

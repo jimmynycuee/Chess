@@ -1,0 +1,2 @@
+lichess-org/chess-openings (https://github.com/lichess-org/chess-openings)
+Released under the CC0 Public Domain Dedication.
