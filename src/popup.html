@@ -11,6 +11,7 @@
   section { padding: 4px 14px 12px; display: grid; gap: 10px; }
   label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   input[type=range] { width: 110px; }
+  .piece-status { font-size: 12px; }
   .note { font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); padding: 10px 14px; margin: 0; }
 </style>
 </head>
@@ -25,12 +26,7 @@
     <label>復盤音效（chess.com 音效，需連網） <input type="checkbox" id="soundOn"></label>
     <label>即時分析深度 <span><input type="range" id="liveDepth" min="10" max="22"> <b id="liveDepthVal"></b></span></label>
     <label>賽後復盤深度 <span><input type="range" id="reportDepth" min="10" max="20"> <b id="reportDepthVal"></b></span></label>
-    <label>賽後復盤的棋子 <select id="pieceSet">
-      <option value="chesscom">chess.com（Neo，需連網）</option>
-      <option value="papercut">立體（papercut）</option>
-      <option value="spatial">立體（spatial）</option>
-      <option value="cburnett">經典平面（cburnett）</option>
-    </select></label>
+    <div class="piece-status">棋子樣式：<b id="pieceStatus">讀取中…</b></div>
   </section>
   <p class="note">只在分析棋盤、對電腦，以及對局結束後出現。真人對局（包含友誼賽）進行中，面板會從頁面上完全移除，以符合 chess.com 的 Fair Play 規則。</p>
   <script type="module" src="popup.js"></script>

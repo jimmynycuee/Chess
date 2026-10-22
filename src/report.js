@@ -30,7 +30,6 @@ const LESSON_LOSS = 8; // 自己這步勝率掉超過這個值，才算一課
 const OPP_MISTAKE_LOSS = 10; // 對手這步勝率掉超過這個值，才算「可以利用的機會」
 const PRACTICE_OK_LOSS = 3; // 練習時，比最佳著法只差這麼多也算答對
 const ANALYSIS_VERSION = 2; // 分析格式改變時遞增，讓舊的快取重新分析
-const PIECE_SETS = ['chesscom', 'papercut', 'spatial', 'cburnett'];
 const LEVELS = {
   easy: { label: '簡單', skill: 2, depth: 6 },
   normal: { label: '普通', skill: 8, depth: 10 },
@@ -274,15 +273,17 @@ const sideName = (c) => (c === 'w' ? '白方' : '黑方');
 const playerName = (c) => (c === 'w' ? game.white : game.black);
 const moverWin = (winWhite, c) => (c === 'w' ? winWhite : 100 - winWhite);
 const other = (c) => (c === 'w' ? 'b' : 'w');
-const pieceSet = () => (PIECE_SETS.includes(settings.pieceSet) ? settings.pieceSet : 'chesscom');
 
-// chess.com 的棋子圖不放進專案，直接從 chess.com 網站載入（只在自己的瀏覽器裡顯示）；載不到就改用 papercut。
+// 棋子：用從 chess.com 頁面取得、存在本機的棋子圖（跟你在 chess.com 用的樣式一樣）。
+// 還沒取得時先試 chess.com 的 Neo 圖檔網址，再不行才暫時用 papercut。
+let pieceImages = (await chrome.storage.local.get('pieceImages')).pieceImages || null;
 const CHESSCOM_PIECES = 'https://images.chesscomfiles.com/chess-themes/pieces/neo/150/';
-let chesscomFailed = false; // 載不到一次就整個改用 papercut，不用每次重畫都再試
+let chesscomFailed = false;
 function pieceSrc(color, type) {
-  if (pieceSet() === 'chesscom' && !chesscomFailed) return `${CHESSCOM_PIECES}${color}${type.toLowerCase()}.png`;
-  const set = pieceSet() === 'chesscom' ? 'papercut' : pieceSet();
-  return `../pieces/${set}/${color}${type.toUpperCase()}.svg`;
+  const code = `${color}${type.toLowerCase()}`;
+  if (pieceImages?.imgs?.[code]) return pieceImages.imgs[code];
+  if (!chesscomFailed) return `${CHESSCOM_PIECES}${code}.png`;
+  return `../pieces/papercut/${color}${type.toUpperCase()}.svg`;
 }
 document.addEventListener(
   'error',
@@ -292,9 +293,15 @@ document.addEventListener(
     const name = img.src.slice(CHESSCOM_PIECES.length, -4); // 例如 wp
     chesscomFailed = true;
     img.src = `../pieces/papercut/${name[0]}${name[1].toUpperCase()}.svg`;
+    pieceNotice();
   },
   true
 );
+
+function pieceNotice() {
+  const el = $('#piece-notice');
+  if (el) el.hidden = !!pieceImages || !chesscomFailed;
+}
 
 function moveLabel(r) {
   return `${Math.ceil(r.ply / 2)}${r.color === 'w' ? '.' : '...'} ${r.san}`;
@@ -1782,14 +1789,18 @@ document.addEventListener('keydown', (e) => {
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.pieceImages) {
+    pieceImages = changes.pieceImages.newValue || null;
+    pieceNotice();
+    return render();
+  }
   if (area !== 'sync') return;
-  if (changes.pieceSet) settings.pieceSet = changes.pieceSet.newValue;
   if (changes.soundOn) settings.soundOn = changes.soundOn.newValue;
   if (changes.reviewBestMove) {
     showBest = !!changes.reviewBestMove.newValue;
     $('#best-toggle').checked = showBest;
   }
-  if (changes.pieceSet || changes.reviewBestMove) render();
+  if (changes.reviewBestMove) render();
 });
 
 function renderAll() {

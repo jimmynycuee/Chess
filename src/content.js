@@ -346,7 +346,31 @@
 
   // ---------- 主流程 ----------
 
+  // ---------- 取得 chess.com 的棋子樣式 ----------
+  // chess.com 棋盤上的棋子是 <div class="piece wp ...">，圖檔放在 background-image。
+  // 讀出網址樣板後交給 background 下載存起來，賽後復盤頁就能用一樣的棋子。
+  const PIECE_CODES = ['wp', 'wn', 'wb', 'wr', 'wq', 'wk', 'bp', 'bn', 'bb', 'br', 'bq', 'bk'];
+  let pieceTemplateSent = null;
+
+  function harvestPieces() {
+    for (const el of document.querySelectorAll('.piece')) {
+      const code = [...el.classList].find((c) => PIECE_CODES.includes(c));
+      if (!code) continue;
+      const m = getComputedStyle(el).backgroundImage.match(/url\(["']?(.*?)["']?\)/);
+      if (!m) continue;
+      const url = new URL(m[1], location.href).href;
+      const re = new RegExp(`/${code}\\.(png|svg|webp)`);
+      if (!re.test(url)) continue;
+      const template = url.replace(re, '/{p}.$1');
+      if (template === pieceTemplateSent) return;
+      pieceTemplateSent = template;
+      chrome.runtime.sendMessage({ type: 'harvest-pieces', template }).catch(() => {});
+      return;
+    }
+  }
+
   async function update() {
+    harvestPieces();
     if (!settings.enabled) return removePanel();
     const mode = pageMode();
     const justEnded = mode === 'review' && lastMode === 'blocked';

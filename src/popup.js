@@ -15,6 +15,7 @@ for (const key of ['liveDepth', 'reportDepth']) {
   el.addEventListener('change', () => chrome.storage.sync.set({ [key]: Number(el.value) }));
 }
 
-const pieceSel = document.getElementById('pieceSet');
-pieceSel.value = s.pieceSet;
-pieceSel.addEventListener('change', () => chrome.storage.sync.set({ pieceSet: pieceSel.value }));
+const { pieceImages } = await chrome.storage.local.get('pieceImages');
+document.getElementById('pieceStatus').textContent = pieceImages
+  ? `chess.com（${pieceImages.theme}，已取得）`
+  : '尚未取得：打開 chess.com 任一盤棋就會自動取得';

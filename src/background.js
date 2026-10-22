@@ -43,6 +43,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return;
   }
 
+  if (msg?.type === 'harvest-pieces') {
+    savePieces(msg.template).catch(() => {});
+    return;
+  }
+
   if (msg?.type === 'pre-progress') {
     savePrep(msg.key, msg.data);
     return;
@@ -70,6 +75,31 @@ function savePrep(key, data) {
       if (drop.length) await chrome.storage.local.remove(drop);
     })
     .catch(() => {});
+}
+
+const PIECE_CODES = ['wp', 'wn', 'wb', 'wr', 'wq', 'wk', 'bp', 'bn', 'bb', 'br', 'bq', 'bk'];
+
+function toBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+// 下載 chess.com 的 12 張棋子圖，存成 data URL（只存在這台電腦的瀏覽器裡）。
+async function savePieces(template) {
+  if (!/^https:\/\/([\w-]+\.)*chesscomfiles\.com\//.test(template) && !/^https:\/\/www\.chess\.com\//.test(template)) return;
+  const { pieceImages } = await chrome.storage.local.get('pieceImages');
+  if (pieceImages?.template === template && Object.keys(pieceImages.imgs || {}).length === 12) return;
+  const imgs = {};
+  for (const code of PIECE_CODES) {
+    const res = await fetch(template.replace('{p}', code));
+    if (!res.ok) return;
+    const type = res.headers.get('content-type') || 'image/png';
+    imgs[code] = `data:${type};base64,${toBase64(await res.arrayBuffer())}`;
+  }
+  const theme = template.match(/pieces\/([^/]+)\//)?.[1] || 'chess.com';
+  await chrome.storage.local.set({ pieceImages: { template, theme, imgs, at: Date.now() } });
 }
 
 chrome.commands.onCommand.addListener(async (command) => {
