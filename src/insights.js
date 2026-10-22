@@ -264,8 +264,11 @@ export function buildStory({ results, winW, evals, me, opening, result }) {
 
   if (opening?.name) {
     const nm = opening.zh ? `${opening.zh}（${opening.name}）` : opening.name;
+    const n = moveNo(opening.lastBookPly);
     lines.push(
-      `這盤下的是${nm}，前 ${moveNo(opening.lastBookPly)} 步都還在常見的開局下法裡。`
+      opening.lastBookPly <= 3
+        ? `這盤下的是${nm}，不過第 ${n + 1} 步就離開了常見的開局下法。`
+        : `這盤下的是${nm}，前 ${n} 步都還在常見的開局下法裡。`
     );
   }
 

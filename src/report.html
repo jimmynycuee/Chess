@@ -3,90 +3,109 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>賽後總結</title>
+<title>賽後復盤</title>
 <link rel="stylesheet" href="report.css">
 </head>
 <body>
-  <header class="top">
-    <div>
-      <h1 id="title">賽後總結</h1>
-      <div id="sub" class="muted"></div>
+  <header class="topbar">
+    <div class="brand">♞ <span>賽後復盤</span></div>
+    <div class="game-meta">
+      <div id="title" class="game-title">載入中…</div>
+      <div id="sub" class="muted small"></div>
     </div>
     <div class="actions">
       <div class="seg" id="me-toggle" role="group" aria-label="我執哪一方">
-        <span class="muted">我是</span>
+        <span class="muted small">我是</span>
         <button data-me="w">白方</button>
         <button data-me="b">黑方</button>
       </div>
-      <button id="copy" disabled>複製文字摘要</button>
-      <button id="pgn" disabled>匯出 PGN（含註解）</button>
+      <button id="copy" class="ghost" disabled>複製摘要</button>
+      <button id="pgn" class="ghost" disabled>匯出 PGN</button>
     </div>
   </header>
 
   <div id="progress" class="progress"><div class="progress-bar"></div><span class="progress-text">準備引擎…</span></div>
 
-  <main id="main" hidden>
-    <section class="cards" id="cards"></section>
-
-    <section class="panel">
-      <h2>這盤棋的故事</h2>
-      <div id="story" class="story"></div>
-    </section>
-
-    <section class="panel">
-      <h2>開局・中局・殘局 <span class="muted small">（你在每個階段的準確率；點一下看該階段最大的失誤）</span></h2>
-      <div id="phases" class="phases"></div>
-    </section>
-
-    <section class="panel">
-      <h2>你下得好的地方</h2>
-      <ul id="goods" class="goods"></ul>
-    </section>
-
-    <section class="panel">
-      <h2>本局最重要的課</h2>
-      <div id="lessons" class="lessons"></div>
-    </section>
-
-    <div class="grid">
-      <section class="panel">
-        <h2>錯誤統計</h2>
-        <div id="stats"></div>
-      </section>
-      <section class="panel">
-        <h2>下一步練什麼 <span class="muted small">（連到 Lichess 免費主題謎題）</span></h2>
-        <div id="suggest" class="suggest-list"></div>
-      </section>
-    </div>
-
-    <div class="grid">
-      <section class="panel" id="board-panel">
-        <div class="board-head">
-          <h2 id="pos-title">局面</h2>
-          <div class="nav">
-            <button data-nav="first" title="開頭">⏮</button>
-            <button data-nav="prev" title="上一步 (←)">◀</button>
-            <button data-nav="next" title="下一步 (→)">▶</button>
-            <button data-nav="last" title="最後">⏭</button>
-            <button id="flip" title="翻轉棋盤">⇅</button>
-          </div>
+  <main id="app" hidden>
+    <section class="board-area">
+      <div class="player" id="player-top"></div>
+      <div class="board-wrap">
+        <div class="evalbar" id="evalbar" title="勝率">
+          <div class="eval-white"></div>
+          <span class="eval-text"></span>
         </div>
         <div id="board" class="board"></div>
-        <div id="pos-info" class="pos-info"></div>
-      </section>
-
-      <section class="panel">
-        <h2>對手的失誤 <span class="muted small">（你有沒有抓住機會？）</span></h2>
-        <ul id="opp" class="opp"></ul>
-        <h2>著法</h2>
-        <div id="moves" class="moves"></div>
-      </section>
-    </div>
-
-    <section class="panel">
-      <h2>勝率走勢 <span class="muted small">（白方勝率；點圖可跳到該步）</span></h2>
-      <div id="chart" class="chart"></div>
+      </div>
+      <div class="player" id="player-bottom"></div>
     </section>
+
+    <aside class="side">
+      <nav class="tabs" role="tablist">
+        <button data-tab="review" class="on">復盤</button>
+        <button data-tab="summary">總結</button>
+        <button data-tab="opening">開局</button>
+        <button data-tab="stats">統計</button>
+      </nav>
+
+      <div class="tab-body">
+        <div class="tab" data-tab="review">
+          <div class="coach" id="coach">
+            <div class="coach-head"><span class="coach-avatar">♞</span><div id="coach-title" class="coach-title"></div></div>
+            <div id="coach-body" class="coach-body"></div>
+          </div>
+          <div id="chart" class="chart"></div>
+          <div id="moves" class="moves"></div>
+        </div>
+
+        <div class="tab" data-tab="summary" hidden>
+          <section class="cards" id="cards"></section>
+          <section class="block">
+            <h2>這盤棋的故事</h2>
+            <div id="story" class="story"></div>
+          </section>
+          <section class="block">
+            <h2>開局・中局・殘局</h2>
+            <div id="phases" class="phases"></div>
+          </section>
+          <section class="block">
+            <h2>你下得好的地方</h2>
+            <ul id="goods" class="goods"></ul>
+          </section>
+          <section class="block">
+            <h2>本局最重要的課</h2>
+            <div id="lessons" class="lessons"></div>
+          </section>
+        </div>
+
+        <div class="tab" data-tab="opening" hidden>
+          <div id="opening"></div>
+        </div>
+
+        <div class="tab" data-tab="stats" hidden>
+          <section class="block">
+            <h2>錯誤統計</h2>
+            <div id="stats"></div>
+          </section>
+          <section class="block">
+            <h2>下一步練什麼 <span class="muted small">Lichess 免費主題謎題</span></h2>
+            <div id="suggest" class="suggest-list"></div>
+          </section>
+          <section class="block">
+            <h2>對手的失誤 <span class="muted small">你有沒有抓住機會？</span></h2>
+            <ul id="opp" class="opp"></ul>
+          </section>
+        </div>
+      </div>
+
+      <footer class="controls">
+        <button data-nav="first" title="開頭">⏮</button>
+        <button data-nav="prev" title="上一步（←）">◀</button>
+        <button data-nav="next" title="下一步（→）">▶</button>
+        <button data-nav="last" title="最後">⏭</button>
+        <button id="flip" title="翻轉棋盤">⇅</button>
+        <button id="replay" class="primary" title="從目前這一步開始，自己重新下">🔁 從這裡重新下</button>
+      </footer>
+    </aside>
   </main>
   <script type="module" src="report.js"></script>
 </body>
