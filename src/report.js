@@ -541,7 +541,9 @@ function renderReview() {
   renderEvalBar(evals[sel].score);
 
   const tail = `<div class="muted small">可以直接拖曳棋子試走其他下法。</div>
-    <div class="actions-row"><button class="primary" data-review="replay">從這裡重新下</button></div>`;
+    <div class="actions-row"><button class="primary" data-review="replay">${
+      replayBase() === sel - 1 ? `重下 ${escapeHtml(moveLabel(results[sel - 1]))}` : '從這裡重新下'
+    }</button></div>`;
   const turn = new Chess(fens[sel]).turn();
   const bestBlock = nowBest ? bestNowHtml(povBetter(nowBest, turn), `Best Move（輪到${sideName(turn)}）`) : '';
   if (!played) {
@@ -691,6 +693,23 @@ async function startVariation(kind, base, start = null) {
   }
 }
 
+function replayBase() {
+  const played = sel > 0 ? results[sel - 1] : null;
+  return played && played.color === me ? sel - 1 : sel;
+}
+
+function startReplayHere() {
+  const base = replayBase();
+  const redoing = base === sel - 1;
+  startVariation('replay', base).then(() => {
+    // 重下自己的某一步時，先提示這步的 Best Move
+    if (explore && redoing && results[base].bestUci !== results[base].uci) {
+      explore.hintFirst = results[base];
+      render();
+    }
+  });
+}
+
 // 目前的變化是否還跟實戰一模一樣。
 function onGameLine(ex) {
   return !ex.startLabel && ex.steps.every((st, i) => results[ex.base + i]?.uci === st.uci);
@@ -798,29 +817,24 @@ function undoExplore() {
     group.unshift({ step: ex.steps.pop(), fen: ex.fens.pop(), eval: ex.evals[ex.fens.length] });
     ex.evals.length = ex.fens.length;
   };
-  if (!ex.steps.length) {
-    if (ex.kind === 'free') {
-      const base = ex.base;
-      leaveModes();
-      select(base);
-    }
-    return;
-  }
+  // 重新下／練習時，起點如果輪到對手，就保留對手的第一步（不然會卡在沒人能走的局面）
+  const keep = ex.kind !== 'free' && new Chess(ex.fens[0]).turn() !== ex.myColor ? 1 : 0;
   if (ex.kind === 'free') {
-    popOne();
-  } else {
-    while (ex.steps.length && ex.steps.at(-1).by === 'opp') popOne();
     if (ex.steps.length) popOne();
+  } else {
+    while (ex.steps.length > keep && ex.steps.at(-1).by === 'opp') popOne();
+    if (ex.steps.length > keep) popOne();
+  }
+  if (!group.length) {
+    // 已經在變化的起點：離開變化，回到實戰的上一步
+    const back = ex.fromLine || ex.startLabel ? 0 : Math.max(0, ex.base - 1);
+    leaveModes();
+    return select(back);
   }
   ex.redo.push(group);
   picked = null;
   pendingAnim = group.flatMap((g) => slidesFor(g.step.uci, true)).reverse().slice(0, 2);
   pendingSound = group.at(-1)?.step.san;
-  if (!ex.steps.length && ex.kind === 'free' && !ex.redo.length) {
-    const base = ex.base;
-    leaveModes();
-    return select(base);
-  }
   render();
 }
 
@@ -877,6 +891,8 @@ function renderExplore() {
   const wantBest = (showBest || inOpening) && myTurn && !ex.busy;
   let best = null;
   if (wantBest) best = inOpening ? drillBest(ex, fen, engineNext) : engineNext && { ...engineNext, uci: nowEval?.bestmove };
+  const hint = ex.hintFirst && !ex.steps.length ? ex.hintFirst : null;
+  if (hint && !best) best = { ...hint.better, uci: hint.bestUci };
   drawBoard({
     fen,
     highlight: last ? [last.uci.slice(0, 2), last.uci.slice(2, 4)] : [],
@@ -903,7 +919,8 @@ function renderExplore() {
       <span class="feedback ${tone} small" style="padding:1px 6px">${d >= 0 ? '+' : ''}${d.toFixed(0)}（和起點相比）</span></div>`;
   }
   if (!ex.steps.length) {
-    if (ex.kind === 'replay') html += '<div class="line">輪到你走。對手會先照實戰回應；你一旦走得跟實戰不一樣，就換電腦接手。</div>';
+    if (hint) html += `<div class="line">你實戰走的是 <b>${escapeHtml(hint.san)}</b> ${badge(hint.cls)}。這次試試 Best Move，對手會由電腦接手回應。</div>`;
+    else if (ex.kind === 'replay') html += '<div class="line">輪到你走。對手會先照實戰回應；你一旦走得跟實戰不一樣，就換電腦接手。</div>';
     if (ex.kind === 'drill') html += '<div class="line">對手會照 Main Line 或 Book 回應。Opening 結束前會一直顯示 Best Move，照著走走看。</div>';
   }
   if (ex.kind === 'drill' && endIdx >= 0) {
@@ -942,7 +959,7 @@ function renderExplore() {
 }
 
 $('#coach-body').addEventListener('click', (e) => {
-  if (e.target.closest('[data-review="replay"]')) return startVariation('replay', sel);
+  if (e.target.closest('[data-review="replay"]')) return startReplayHere();
   const b = e.target.closest('button[data-ex]');
   if (b && explore) {
     const act = b.dataset.ex;
@@ -1618,7 +1635,11 @@ function togglePlay() {
 function nav(dir) {
   stopPlay();
   pausedAt = null;
-  if (practice) return;
+  if (practice) {
+    const ply = practice.ply;
+    leaveModes();
+    return select({ first: 0, prev: ply - 2, next: ply, last: moves.length }[dir]);
+  }
   if (lineView) {
     const to = { first: 0, prev: lineView.idx - 1, next: lineView.idx + 1, last: lineView.sans.length }[dir];
     const idx = Math.max(0, Math.min(lineView.sans.length, to));
