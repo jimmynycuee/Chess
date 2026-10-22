@@ -66,8 +66,38 @@ async function live({ sans, depth }) {
   return result;
 }
 
+// ---------- 賽後預先分析：用另一個引擎，不影響即時分析 ----------
+
+let preEngine = null;
+let preJob = null;
+
+async function prepare({ key, sans, depth, existing }) {
+  if (preJob?.key === key) return;
+  if (preJob) preJob.cancelled = true;
+  const job = { key, cancelled: false };
+  preJob = job;
+  if (!preEngine) preEngine = new Engine();
+  const { fens } = replay(sans);
+  const evals = existing?.evals?.slice(0, fens.length) || [];
+  for (let i = evals.length; i < fens.length; i++) {
+    if (job.cancelled) return;
+    evals.push(await preEngine.analyse(fens[i], { depth, multipv: 2 }));
+    const done = evals.length === fens.length;
+    // 每幾步回報一次進度，由 background 存進 storage（offscreen 文件不能直接用 storage）
+    if (done || evals.length % 4 === 0) {
+      chrome.runtime.sendMessage({ type: 'pre-progress', key, data: { done, count: evals.length, total: fens.length, evals } });
+    }
+  }
+  if (preJob === job) preJob = null;
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.target !== 'offscreen') return;
+  if (msg.type === 'prepare') {
+    prepare(msg);
+    sendResponse({ ok: true });
+    return;
+  }
   if (msg.type === 'live') {
     live(msg)
       .then(sendResponse)

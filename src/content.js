@@ -1,7 +1,15 @@
 // 在 chess.com 頁面上讀取著法列表、判斷是否允許分析，並顯示浮動面板。
 // 真人對局進行中一律不分析（chess.com Fair Play 規則，友誼賽也一樣）。
 (() => {
-  const DEFAULTS = { enabled: true, showBestMove: false, showArrow: true, liveDepth: 16, reportDepth: 14, panelScale: 1 };
+  const DEFAULTS = {
+    enabled: true,
+    showBestMove: false,
+    showArrow: true,
+    liveDepth: 16,
+    reportDepth: 14,
+    panelScale: 1,
+    autoOpenReport: false,
+  };
   const SCALES = [0.85, 1, 1.2, 1.4, 1.6];
   const SAN_RE = /^(O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?)[+#]?/;
   const RESULT_RE = /^(1-0|0-1|½-½|1\/2-1\/2)$/;
@@ -58,17 +66,32 @@
     return { sans, ply: selected > 0 ? selected : sans.length };
   }
 
+  // 只算看得見的元素：chess.com 對局結束後常常只是把按鈕藏起來，元素還留在頁面上。
+  function visible(el) {
+    if (!el || !el.getClientRects().length) return false;
+    const st = getComputedStyle(el);
+    return st.visibility !== 'hidden' && st.display !== 'none' && Number(st.opacity) > 0;
+  }
+
+  const LIVE_SEL =
+    '.resign-button-component, .draw-button-component, .abort-button-component, ' +
+    '[data-cy="resign-button-with-confirmation"], [data-cy="draw-button"], [data-cy="abort-button"], ' +
+    'button[aria-label="Resign"], button[aria-label="Abort"], button[aria-label="Offer Draw"], ' +
+    'button[aria-label="認輸"], button[aria-label="提和"], button[aria-label="中止"]';
+  const LIVE_TEXT = /^(Resign|Abort|Offer Draw|Draw|認輸|投降|中止|提和|求和)$/;
+  const OVER_SEL =
+    '.game-over-modal-content, [class*="game-over-modal"], [class*="game-over-header"], [class*="game-over-buttons"], ' +
+    '[class*="game-review-buttons"], [data-cy*="game-over"], [data-cy*="rematch"]';
+  const OVER_TEXT = /^(Game Review|Rematch|New \d+ min|對局回顧|棋局回顧|遊戲回顧|再來一局|重賽|再下一局|新的 ?\d+ ?分鐘)/;
+
   function hasLiveControls() {
-    return !!document.querySelector(
-      '.resign-button-component, .draw-button-component, [data-cy="resign-button-with-confirmation"], ' +
-        '[data-cy="draw-button"], button[aria-label="Resign"], button[aria-label="Abort"], button[aria-label="Offer Draw"]'
-    );
+    if ([...document.querySelectorAll(LIVE_SEL)].some(visible)) return true;
+    return [...document.querySelectorAll('button')].some((b) => LIVE_TEXT.test(b.textContent.trim()) && visible(b));
   }
 
   function isGameOver() {
-    if (document.querySelector('.game-over-modal-content, [class*="game-over-modal"], [class*="game-review-buttons"]')) {
-      return true;
-    }
+    if ([...document.querySelectorAll(OVER_SEL)].some(visible)) return true;
+    if ([...document.querySelectorAll('button, a')].some((b) => OVER_TEXT.test(b.textContent.trim()) && visible(b))) return true;
     const root = moveListRoot();
     if (!root) return false;
     const resultEl = root.querySelector('.game-result, [class*="game-result"], [class*="result-row"]');
@@ -86,9 +109,18 @@
     const path = location.pathname;
     if (/^\/(analysis|play\/computer|computer)/.test(path)) return 'analysis';
     if (!moveListRoot() && !findBoard()) return 'none';
+    // 看得見認輸／提和等按鈕就是進行中（安全優先）；看不見了，再確認有結束訊號才解鎖
     if (hasLiveControls()) return 'blocked';
     if (isGameOver()) return 'review';
     return 'blocked';
+  }
+
+  // 賽後預先分析的鍵值：跟 report.js 用同一個算法（settings.js 的 preKey）。
+  function preKey(sans, depth) {
+    let h = 5381;
+    const str = sans.join(' ');
+    for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+    return `pre:${depth}:${(h >>> 0).toString(36)}:${sans.length}`;
   }
 
   function readPlayers() {
@@ -207,6 +239,7 @@
     if (!panel) buildPanel();
     panel.style.zoom = settings.panelScale;
     panel.querySelector('.crb-best-toggle').checked = settings.showBestMove;
+    renderReportButton();
 
     const r = lastResult;
     if (!r) return;
@@ -316,6 +349,18 @@
   async function update() {
     if (!settings.enabled) return removePanel();
     const mode = pageMode();
+    const justEnded = mode === 'review' && lastMode === 'blocked';
+    lastMode = mode;
+    if (mode === 'review') {
+      const all = readMoves();
+      if (all) prepareReview(all.sans);
+      if (justEnded) {
+        render(mode);
+        panel?.classList.add('crb-attn');
+        setTimeout(() => panel?.classList.remove('crb-attn'), 4000);
+        if (settings.autoOpenReport) setTimeout(openReport, 1500);
+      }
+    }
     if (mode !== 'analysis' && mode !== 'review') {
       lastKey = '';
       lastResult = null;
@@ -354,6 +399,40 @@
     lastResult = res;
     render(nowMode);
   }
+
+  // ---------- 賽後預先分析 ----------
+
+  let lastMode = null;
+  let prep = null; // { key, sans, count, total, done }
+
+  function renderReportButton() {
+    const btn = panel?.querySelector('.crb-report');
+    if (!btn) return;
+    if (prep && !prep.done) btn.textContent = `賽後復盤（準備中 ${Math.round((prep.count / prep.total) * 100) || 0}%）`;
+    else if (prep?.done) btn.textContent = '賽後復盤（已就緒）';
+    else btn.textContent = '賽後復盤';
+  }
+
+  // 對局結束時就在背景先跑完整盤分析，點進復盤頁時不用再等。
+  async function prepareReview(sans) {
+    if (sans.length < 2) return;
+    const key = preKey(sans, settings.reportDepth);
+    if (prep?.key === key) return;
+    prep = { key, sans, count: 0, total: sans.length + 1, done: false };
+    const cur = (await chrome.storage.local.get(key))[key];
+    if (cur) Object.assign(prep, { count: cur.count, done: cur.done });
+    renderReportButton();
+    if (!prep.done) chrome.runtime.sendMessage({ type: 'prepare', key, sans, depth: settings.reportDepth }).catch(() => {});
+  }
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !prep || !changes[prep.key]) return;
+    const v = changes[prep.key].newValue;
+    if (!v) return;
+    prep.count = v.count;
+    prep.done = v.done;
+    renderReportButton();
+  });
 
   async function openReport() {
     const mode = pageMode();

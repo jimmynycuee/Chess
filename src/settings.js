@@ -8,7 +8,16 @@ export const DEFAULT_SETTINGS = {
   reportDepth: 14,
   panelScale: 1,
   pieceSet: 'papercut',
+  autoOpenReport: false,
 };
+
+// 賽後預先分析的鍵值（content.js 裡有一份相同的算法）。
+export function preKey(sans, depth) {
+  let h = 5381;
+  const str = sans.join(' ');
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return `pre:${depth}:${(h >>> 0).toString(36)}:${sans.length}`;
+}
 
 export async function loadSettings() {
   const stored = await chrome.storage.sync.get(DEFAULT_SETTINGS);

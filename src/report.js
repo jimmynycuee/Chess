@@ -1,6 +1,6 @@
 import { Chess } from '../vendor/chess.js';
 import { Engine } from './engine.js';
-import { loadSettings } from './settings.js';
+import { loadSettings, preKey } from './settings.js';
 import {
   replay,
   evaluateMove,
@@ -90,15 +90,41 @@ async function quickEval(fen) {
   return res;
 }
 
+function showProgress(i, label) {
+  $('.progress-text').textContent = `${label} ${i}/${fens.length - 1}（深度 ${settings.reportDepth}）`;
+  $('.progress-bar').style.width = `${(i / (fens.length - 1 || 1)) * 100}%`;
+}
+
+// 等背景的預先分析跑完；超過 10 秒沒有進度就改成自己接著算。
+async function waitForPrep(key) {
+  let lastCount = -1;
+  let lastChange = Date.now();
+  for (;;) {
+    const v = (await chrome.storage.local.get(key))[key];
+    if (v?.done && v.evals?.length === fens.length) return v.evals;
+    const count = v?.count || 0;
+    if (count !== lastCount) {
+      lastCount = count;
+      lastChange = Date.now();
+      showProgress(count, '背景分析中…');
+    }
+    if (Date.now() - lastChange > 10000) return v?.evals || [];
+    await new Promise((r) => setTimeout(r, 400));
+  }
+}
+
 async function analyseGame() {
   const a = game.analysis;
   if (a?.v === ANALYSIS_VERSION && a.depth === settings.reportDepth && a.evals.length === fens.length) {
     return a.evals;
   }
-  const out = [];
-  for (let i = 0; i < fens.length; i++) {
-    $('.progress-text').textContent = `Stockfish 分析中… ${i}/${fens.length - 1}（深度 ${settings.reportDepth}）`;
-    $('.progress-bar').style.width = `${(i / (fens.length - 1 || 1)) * 100}%`;
+  const key = preKey(game.sans, settings.reportDepth);
+  const pre = (await chrome.storage.local.get(key))[key];
+  let out = [];
+  if (pre?.done && pre.evals?.length === fens.length) out = pre.evals;
+  else if (pre) out = await waitForPrep(key);
+  for (let i = out.length; i < fens.length; i++) {
+    showProgress(i, 'Stockfish 分析中…');
     // 多算第二好的走法，用來找「唯一好棋」
     out.push(await getEngine().analyse(fens[i], { depth: settings.reportDepth, multipv: 2 }));
   }
