@@ -67,7 +67,10 @@ const results = moves.map((move, i) => {
   const ev = evaluateMove({ before: evals[i], after: evals[i + 1], move, ply: i + 1 });
   ev.bestPv = uciLineToSan(fens[i], evals[i].pv.length ? evals[i].pv : [evals[i].bestmove || ''], 5);
   ev.why = BAD.includes(ev.cls) ? explainMistake({ fenBefore: fens[i], uci: ev.uci, after: evals[i + 1], mover: ev.color }) : [];
-  ev.better = ev.cls !== 'best' ? explainBest({ fenBefore: fens[i], before: evals[i], mover: ev.color }) : null;
+  ev.better =
+    ev.cls !== 'best'
+      ? explainBest({ fenBefore: fens[i], before: evals[i], mover: ev.color, playedAfter: evals[i + 1].score })
+      : null;
   return ev;
 });
 // 錯失良機：對手剛犯了大錯，你這步卻沒有把握住。
@@ -343,9 +346,18 @@ function renderPosition() {
     html += `<ul class="why">${played.why.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`;
   }
   if (showBetter) {
-    html += `<div class="line"><span class="legend-arrow" style="background:#3ba55d"></span>更好的著法：${escapeHtml(played.better.text)}</div>`;
+    html += betterHtml(played.better);
   }
   info.innerHTML = html;
+}
+
+// 「更好的著法」區塊：著法、為什麼好（最多三點）、接下來的變化。
+function betterHtml(better) {
+  return `<div class="better">
+    <div class="line"><span class="legend-arrow" style="background:#3ba55d"></span>更好的著法：<b>${escapeHtml(better.san)}</b>　為什麼比較好：</div>
+    <ul class="why">${better.reasons.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+    <div class="muted small">接下來的變化：${escapeHtml(better.line)}</div>
+  </div>`;
 }
 
 // ---------- 練習模式 ----------
@@ -388,6 +400,7 @@ function renderPractice() {
   let html = `<div class="practice">
     <div class="line">${escapeHtml(intro)} <span class="muted small">點棋子，再點目的地。</span></div>`;
   if (feedback) html += `<div class="feedback ${feedback.kind}">${escapeHtml(feedback.text)}</div>`;
+  if (solved) html += betterHtml(r.better);
   if (hints && !solved) {
     html += `<ol class="hints">${r.better.hints.slice(0, hints).map((h) => `<li>${escapeHtml(h)}</li>`).join('')}</ol>`;
   }
@@ -406,7 +419,7 @@ $('#pos-info').addEventListener('click', (e) => {
   if (!b || !practice) return;
   const act = b.dataset.act;
   if (act === 'hint') practice.hints = Math.min(2, practice.hints + 1);
-  if (act === 'answer') solve(practice.r.bestUci, { kind: 'info', text: practice.r.better.text }, true);
+  if (act === 'answer') solve(practice.r.bestUci, { kind: 'info', text: `答案是 ${practice.r.better.san}。` }, true);
   if (act === 'next') return startPractice(Number(b.dataset.ply));
   if (act === 'exit') {
     const ply = practice.ply;
@@ -437,7 +450,7 @@ $('#board').addEventListener('click', async (e) => {
 
 async function checkAnswer(uci, san) {
   const { r, ply } = practice;
-  if (uci === r.bestUci) return solve(uci, { kind: 'ok', text: `答對了！${r.better.text}` });
+  if (uci === r.bestUci) return solve(uci, { kind: 'ok', text: `答對了！${r.better.san} 就是最好的走法。` });
 
   practice.busy = true;
   practice.feedback = { kind: 'info', text: `${san}… 檢查中` };
@@ -448,7 +461,7 @@ async function checkAnswer(uci, san) {
   practice.busy = false;
   const loss = moverWin(r.winBeforeW, r.color) - moverWin(whiteWinPercent(res.score), r.color);
   if (loss <= PRACTICE_OK_LOSS) {
-    return solve(uci, { kind: 'ok', text: `${san} 也是好棋，答對了！引擎的首選是：${r.better.text}` }, false, chess.fen());
+    return solve(uci, { kind: 'ok', text: `${san} 也是好棋，答對了！引擎的首選是 ${r.better.san}，理由如下：` }, false, chess.fen());
   }
   practice.hints = Math.max(practice.hints, 1);
   practice.feedback = { kind: 'bad', text: `${san} 還不夠好（勝率會掉 ${loss.toFixed(0)}%）。再想想，看看下面的提示。` };

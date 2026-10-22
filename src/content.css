@@ -72,7 +72,12 @@
 #crb-panel .crb-delta.crb-neg { color: #f08a7e; }
 #crb-panel .crb-why { font-size: 13px; color: #f0d9a8; margin-top: 2px; }
 #crb-panel .crb-muted { font-size: 13px; color: #9e9b98; }
-#crb-panel .crb-best { color: #7fb8ff; font-size: 14px; }
+#crb-panel .crb-best { font-size: 13px; border-left: 3px solid #4a9eff; padding-left: 8px; display: grid; gap: 4px; }
+#crb-panel .crb-best[hidden] { display: none; }
+#crb-panel .crb-best-move { color: #7fb8ff; font-size: 15px; font-weight: 700; }
+#crb-panel .crb-reasons { margin: 0; padding-left: 16px; color: #e8e6e3; }
+#crb-panel .crb-reasons li { margin: 2px 0; }
+#crb-panel .crb-pv { color: #9e9b98; font-size: 12px; }
 #crb-panel .crb-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
 #crb-panel kbd {
   margin-left: auto;

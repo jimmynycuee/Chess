@@ -197,3 +197,5 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .hints { margin: 0; padding-left: 20px; color: var(--muted); }
 
 .moves .mv.mine { font-weight: 600; }
+
+.better { display: grid; gap: 4px; margin-top: 6px; padding: 8px 10px; border-left: 3px solid #3ba55d; background: var(--bg); border-radius: 4px; }

@@ -246,7 +246,7 @@
       if (settings.showBestMove && r.last.cls !== 'best' && r.last.bestSan) {
         const line3 = document.createElement('div');
         line3.className = 'crb-muted';
-        line3.textContent = `這步更好的是：${r.last.bestSan}`;
+        line3.textContent = `這步更好的是：${r.last.bestSan}${r.last.betterWhy ? `，因為${r.last.betterWhy}` : ''}`;
         last.append(line3);
       }
     } else {
@@ -256,7 +256,15 @@
     const best = panel.querySelector('.crb-best');
     best.hidden = !settings.showBestMove;
     if (settings.showBestMove && r.best) {
-      best.textContent = `最佳著法：${r.best.pvSan[0] || r.best.uci}　${r.best.pvSan.slice(1).join(' ')}`;
+      best.innerHTML = '<div class="crb-best-move"></div><ul class="crb-reasons"></ul><div class="crb-pv"></div>';
+      best.querySelector('.crb-best-move').textContent = `最佳著法：${r.best.pvSan[0] || r.best.uci}`;
+      const ul = best.querySelector('.crb-reasons');
+      for (const t of r.best.reasons || []) {
+        const li = document.createElement('li');
+        li.textContent = t;
+        ul.append(li);
+      }
+      best.querySelector('.crb-pv').textContent = `接下來：${r.best.pvSan.join(' ')}`;
       if (settings.showArrow) drawArrow(r.best.uci);
       else clearArrow();
     } else {

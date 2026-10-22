@@ -1,7 +1,7 @@
 // 常駐的 offscreen 文件：持有 Stockfish worker，替內容腳本分析目前局面。
 import { Engine } from './engine.js';
 import { replay, evaluateMove, whiteWinPercent, formatScore, uciLineToSan } from './analysis.js';
-import { explainMistake } from './explain.js';
+import { explainMistake, explainBest } from './explain.js';
 
 const engine = new Engine();
 const cache = new Map();
@@ -39,7 +39,11 @@ async function live({ sans, depth }) {
     winW: whiteWinPercent(cur.score),
     depth: cur.depth,
     best: cur.bestmove
-      ? { uci: cur.bestmove, pvSan: uciLineToSan(fen, cur.pv.length ? cur.pv : [cur.bestmove]) }
+      ? {
+          uci: cur.bestmove,
+          pvSan: uciLineToSan(fen, cur.pv.length ? cur.pv : [cur.bestmove]),
+          reasons: explainBest({ fenBefore: fen, before: cur, mover: fen.split(' ')[1] })?.reasons || [],
+        }
       : null,
     last: null,
   };
@@ -50,6 +54,10 @@ async function live({ sans, depth }) {
     if (!before || isStale()) return { stale: true };
     const ev = evaluateMove({ before, after: cur, move: moves[moves.length - 1], ply: moves.length });
     ev.bestSan = before.bestmove ? uciLineToSan(prevFen, [before.bestmove])[0] : null;
+    if (ev.cls !== 'best') {
+      ev.betterWhy =
+        explainBest({ fenBefore: prevFen, before, mover: ev.color, playedAfter: cur.score })?.reasons[0] || null;
+    }
     if (['inaccuracy', 'mistake', 'blunder'].includes(ev.cls)) {
       ev.why = explainMistake({ fenBefore: prevFen, uci: ev.uci, after: cur, mover: ev.color })[0] || null;
     }
