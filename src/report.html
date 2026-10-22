@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>賽後總結</title>
+<link rel="stylesheet" href="report.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1 id="title">賽後總結</h1>
+      <div id="sub" class="muted"></div>
+    </div>
+    <div class="actions">
+      <button id="copy" disabled>複製文字摘要</button>
+      <button id="pgn" disabled>匯出 PGN（含註解）</button>
+    </div>
+  </header>
+
+  <div id="progress" class="progress"><div class="progress-bar"></div><span class="progress-text">準備引擎…</span></div>
+
+  <main id="main" hidden>
+    <section class="cards" id="cards"></section>
+
+    <section class="panel">
+      <h2>勝率走勢 <span class="muted small">（白方勝率；點圖可跳到該步）</span></h2>
+      <div id="chart" class="chart"></div>
+    </section>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="board-head">
+          <h2 id="pos-title">局面</h2>
+          <div class="nav">
+            <button data-nav="first" title="開頭">⏮</button>
+            <button data-nav="prev" title="上一步 (←)">◀</button>
+            <button data-nav="next" title="下一步 (→)">▶</button>
+            <button data-nav="last" title="最後">⏭</button>
+            <button id="flip" title="翻轉棋盤">⇅</button>
+          </div>
+        </div>
+        <div id="board" class="board"></div>
+        <div id="pos-info" class="pos-info"></div>
+      </section>
+
+      <section class="panel">
+        <h2>關鍵時刻</h2>
+        <ol id="moments" class="moments"></ol>
+        <h2>著法</h2>
+        <div id="moves" class="moves"></div>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="report.js"></script>
+</body>
+</html>

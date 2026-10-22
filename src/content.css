@@ -1,0 +1,97 @@
+#crb-panel {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  width: 250px;
+  z-index: 2147483000;
+  background: #262421;
+  color: #e8e6e3;
+  border: 1px solid #3c3a37;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
+}
+#crb-panel[hidden] { display: none; }
+#crb-panel .crb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  cursor: move;
+  border-bottom: 1px solid #3c3a37;
+  user-select: none;
+}
+#crb-panel .crb-title { font-weight: 600; }
+#crb-panel button {
+  font: inherit;
+  color: inherit;
+  background: #3c3a37;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#crb-panel button:disabled { opacity: 0.4; cursor: not-allowed; }
+#crb-panel .crb-min { width: 22px; height: 22px; }
+#crb-panel.crb-collapsed .crb-body { display: none; }
+#crb-panel .crb-body { padding: 8px 10px 10px; display: grid; gap: 8px; }
+#crb-panel .crb-status { font-size: 11px; color: #9e9b98; }
+#crb-panel .crb-status.crb-warn { color: #f0b35a; font-size: 12px; }
+#crb-panel.crb-blocked .crb-eval,
+#crb-panel.crb-blocked .crb-last,
+#crb-panel.crb-blocked .crb-best,
+#crb-panel.crb-blocked .crb-toggle { display: none; }
+#crb-panel .crb-bar {
+  position: relative;
+  height: 18px;
+  background: #403d39;
+  border-radius: 4px;
+  overflow: hidden;
+}
+#crb-panel .crb-bar-white {
+  height: 100%;
+  width: 50%;
+  background: #f0eee9;
+  transition: width 0.3s ease;
+}
+#crb-panel .crb-bar-text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7a7672;
+  mix-blend-mode: difference;
+}
+#crb-panel .crb-wins { display: flex; justify-content: space-between; font-size: 12px; margin-top: 2px; }
+#crb-panel .crb-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #fff;
+  font-weight: 600;
+}
+#crb-panel .crb-delta { font-size: 12px; color: #c9c6c2; }
+#crb-panel .crb-delta.crb-neg { color: #f08a7e; }
+#crb-panel .crb-muted { font-size: 12px; color: #9e9b98; }
+#crb-panel .crb-best { color: #7fb8ff; font-size: 12px; }
+#crb-panel .crb-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+#crb-panel kbd {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 0 4px;
+  border: 1px solid #55524e;
+  border-radius: 3px;
+  color: #9e9b98;
+}
+#crb-panel .crb-report { padding: 6px; font-weight: 600; background: #81b64c; color: #fff; }
+
+#crb-arrow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 100;
+}

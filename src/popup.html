@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>Chess Review Buddy</title>
+<style>
+  :root { color-scheme: light dark; --bg: #ffffff; --fg: #1f1d1b; --muted: #6b6762; --line: #e3e0dc; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #262421; --fg: #e8e6e3; --muted: #9e9b98; --line: #3c3a37; } }
+  body { margin: 0; width: 280px; background: var(--bg); color: var(--fg); font: 13px/1.5 system-ui, "Noto Sans TC", sans-serif; }
+  header { padding: 12px 14px 8px; font-weight: 700; font-size: 15px; }
+  section { padding: 4px 14px 12px; display: grid; gap: 10px; }
+  label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  input[type=range] { width: 110px; }
+  .note { font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); padding: 10px 14px; margin: 0; }
+</style>
+</head>
+<body>
+  <header>♞ Chess Review Buddy</header>
+  <section>
+    <label>啟用面板 <input type="checkbox" id="enabled"></label>
+    <label>顯示最佳著法 <input type="checkbox" id="showBestMove"></label>
+    <label>在棋盤上畫箭頭 <input type="checkbox" id="showArrow"></label>
+    <label>即時分析深度 <span><input type="range" id="liveDepth" min="10" max="22"> <b id="liveDepthVal"></b></span></label>
+    <label>賽後總結深度 <span><input type="range" id="reportDepth" min="10" max="20"> <b id="reportDepthVal"></b></span></label>
+  </section>
+  <p class="note">只在分析棋盤、對電腦，以及對局結束後啟用。真人對局（包含友誼賽）進行中會自動停用，以符合 chess.com 的 Fair Play 規則。</p>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Chess Review Buddy",
+  "version": "0.1.0",
+  "description": "在 chess.com 的分析棋盤、對電腦與賽後頁面顯示勝率變化、最佳著法與賽後總結。真人對局進行中自動停用。",
+  "permissions": ["storage", "offscreen"],
+  "host_permissions": ["https://www.chess.com/*"],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.chess.com/*"],
+      "js": ["src/content.js"],
+      "css": ["src/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Chess Review Buddy",
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "commands": {
+    "toggle-best-move": {
+      "suggested_key": { "default": "Alt+B" },
+      "description": "切換最佳著法顯示"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}
