@@ -521,9 +521,11 @@ function betterHtml(better, label = 'Best Move') {
 
 function renderReview() {
   const played = sel > 0 ? results[sel - 1] : null;
-  const showBetter = played && played.better && !['best', 'book'].includes(played.cls);
+  // 播放途中不顯示 Best Move（會跟實際下法混在一起），只有停在關鍵時刻才顯示
+  const atKey = pausedAt === sel;
+  const showBetter = played && played.better && !['best', 'book'].includes(played.cls) && (!playing || atKey);
   const nowBest =
-    showBest && evals[sel].bestmove
+    showBest && !playing && !atKey && evals[sel].bestmove
       ? explainBest({ fenBefore: fens[sel], before: evals[sel], mover: new Chess(fens[sel]).turn() })
       : null;
   let arrow = null;
@@ -1608,6 +1610,7 @@ function togglePlay() {
   if (sel >= moves.length) select(0);
   playing = true;
   updatePlayButton();
+  render(); // 立刻拿掉 Best Move 箭頭
   // 剛從關鍵時刻繼續時馬上走下一步，其他情況稍等一下再開始
   playTimer = setTimeout(tick, pausedAt === sel ? 0 : 400);
 }
