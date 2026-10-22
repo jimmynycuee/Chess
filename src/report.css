@@ -448,8 +448,15 @@ select {
 @media (min-width: 961px) {
   .tab-body:has(> .tab[data-tab="review"]:not([hidden])) { overflow: hidden; display: flex; flex-direction: column; }
   .tab[data-tab="review"]:not([hidden]) { display: flex; flex-direction: column; min-height: 0; flex: 1; }
-  .tab[data-tab="review"] .coach { flex: 0 1 auto; max-height: 62%; overflow-y: auto; }
+  .tab[data-tab="review"] .coach { flex: 0 0 auto; max-height: 75%; overflow-y: auto; }
   .tab[data-tab="review"] .chart { flex: 0 0 auto; }
-  .tab[data-tab="review"] .moves { flex: 1 1 auto; min-height: 60px; overflow-y: auto; align-content: start; }
+  .tab[data-tab="review"] .moves { flex: 1 1 0; min-height: 0; overflow-y: auto; align-content: start; }
 }
 .phase-label.end { transform: translateX(calc(-100% - 4px)); }
+
+@media (min-width: 961px) and (max-height: 760px) {
+  .tab[data-tab="review"] .chart svg { height: 60px; }
+}
+/* 教練框內容超出時，顯示看得見的捲軸 */
+.coach::-webkit-scrollbar { width: 8px; }
+.coach::-webkit-scrollbar-thumb { background: #55524e; border-radius: 4px; }

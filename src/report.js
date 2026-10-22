@@ -30,7 +30,7 @@ const LESSON_LOSS = 8; // 自己這步勝率掉超過這個值，才算一課
 const OPP_MISTAKE_LOSS = 10; // 對手這步勝率掉超過這個值，才算「可以利用的機會」
 const PRACTICE_OK_LOSS = 3; // 練習時，比最佳著法只差這麼多也算答對
 const ANALYSIS_VERSION = 2; // 分析格式改變時遞增，讓舊的快取重新分析
-const PIECE_SETS = ['papercut', 'spatial', 'cburnett'];
+const PIECE_SETS = ['chesscom', 'papercut', 'spatial', 'cburnett'];
 const LEVELS = {
   easy: { label: '簡單', skill: 2, depth: 6 },
   normal: { label: '普通', skill: 8, depth: 10 },
@@ -177,7 +177,24 @@ const sideName = (c) => (c === 'w' ? '白方' : '黑方');
 const playerName = (c) => (c === 'w' ? game.white : game.black);
 const moverWin = (winWhite, c) => (c === 'w' ? winWhite : 100 - winWhite);
 const other = (c) => (c === 'w' ? 'b' : 'w');
-const pieceSet = () => (PIECE_SETS.includes(settings.pieceSet) ? settings.pieceSet : 'papercut');
+const pieceSet = () => (PIECE_SETS.includes(settings.pieceSet) ? settings.pieceSet : 'chesscom');
+
+// chess.com 的棋子圖不放進專案，直接從 chess.com 網站載入（只在自己的瀏覽器裡顯示）；載不到就改用 papercut。
+const CHESSCOM_PIECES = 'https://images.chesscomfiles.com/chess-themes/pieces/neo/150/';
+function pieceSrc(color, type) {
+  if (pieceSet() === 'chesscom') return `${CHESSCOM_PIECES}${color}${type.toLowerCase()}.png`;
+  return `../pieces/${pieceSet()}/${color}${type.toUpperCase()}.svg`;
+}
+document.addEventListener(
+  'error',
+  (e) => {
+    const img = e.target;
+    if (img.tagName !== 'IMG' || !img.src.startsWith(CHESSCOM_PIECES)) return;
+    const name = img.src.slice(CHESSCOM_PIECES.length, -4); // 例如 wp
+    img.src = `../pieces/papercut/${name[0]}${name[1].toUpperCase()}.svg`;
+  },
+  true
+);
 
 function moveLabel(r) {
   return `${Math.ceil(r.ply / 2)}${r.color === 'w' ? '.' : '...'} ${r.san}`;
@@ -289,7 +306,7 @@ function drawBoard({ fen, highlight = [], selected = null, targets = [], arrow =
       const coordF = vr === 7 ? `<span class="coord f">${sq[0]}</span>` : '';
       const coordR = vf === 0 ? `<span class="coord r">${sq[1]}</span>` : '';
       const piece = p
-        ? `<img class="pc" src="../pieces/${pieceSet()}/${p === p.toUpperCase() ? 'w' : 'b'}${p.toUpperCase()}.svg" alt="${p}" draggable="false">`
+        ? `<img class="pc" src="${pieceSrc(p === p.toUpperCase() ? 'w' : 'b', p)}" alt="${p}" draggable="false">`
         : '';
       html += `<div class="${cls}" data-sq="${sq}">${coordR}${coordF}${piece}</div>`;
     }

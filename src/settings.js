@@ -7,7 +7,7 @@ export const DEFAULT_SETTINGS = {
   liveDepth: 16,
   reportDepth: 14,
   panelScale: 1,
-  pieceSet: 'papercut',
+  pieceSet: 'chesscom',
   autoOpenReport: false,
 };
 
