@@ -45,6 +45,7 @@ src/
   explain.js                 規則式白話解釋：沒保護的子、捉雙、殺棋、子力得失、練習提示
   report.html / .js / .css   賽後總結頁
   popup.html / .js           設定（深度、開關）
+pieces/                      棋子圖（Lichess cburnett，GPLv2+）
 vendor/
   stockfish.js / .wasm       Stockfish 17.1 lite single-thread（GPLv3）
   chess.js                   chess.js 1.4.0（BSD-2）
@@ -60,3 +61,4 @@ vendor/
 ## 授權
 
 本專案包含 Stockfish（GPLv3），因此整體以 GPLv3 散布。見 `vendor/STOCKFISH-LICENSE.txt`。
+棋子圖為 Colin M.L. Burnett 的 cburnett 棋子（取自 Lichess，GPLv2 或更新版本）。

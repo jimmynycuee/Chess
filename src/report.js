@@ -12,7 +12,6 @@ import {
 } from './analysis.js';
 import { explainMistake, explainBest } from './explain.js';
 
-const PIECES = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 const COUNTED = ['best', 'excellent', 'good', 'book', 'inaccuracy', 'mistake', 'blunder'];
 const BAD = ['inaccuracy', 'mistake', 'blunder'];
 const LESSON_LOSS = 8; // 自己這步勝率掉超過這個值，才算一課
@@ -294,7 +293,9 @@ function drawBoard({ fen, highlight = [], selected = null, targets = [], arrow =
       ].join(' ');
       const coordF = vr === 7 ? `<span class="coord f">${sq[0]}</span>` : '';
       const coordR = vf === 0 ? `<span class="coord r">${sq[1]}</span>` : '';
-      const piece = p ? `<span class="pc ${p === p.toUpperCase() ? 'w' : 'b'}">${PIECES[p.toLowerCase()]}</span>` : '';
+      const piece = p
+        ? `<img class="pc" src="../pieces/${p === p.toUpperCase() ? 'w' : 'b'}${p.toUpperCase()}.svg" alt="${p}" draggable="false">`
+        : '';
       html += `<div class="${cls}" data-sq="${sq}">${coordR}${coordF}${piece}</div>`;
     }
   }
