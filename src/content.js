@@ -1,7 +1,8 @@
 // 在 chess.com 頁面上讀取著法列表、判斷是否允許分析，並顯示浮動面板。
 // 真人對局進行中一律不分析（chess.com Fair Play 規則，友誼賽也一樣）。
 (() => {
-  const DEFAULTS = { enabled: true, showBestMove: false, showArrow: true, liveDepth: 16, reportDepth: 14 };
+  const DEFAULTS = { enabled: true, showBestMove: false, showArrow: true, liveDepth: 16, reportDepth: 14, panelScale: 1 };
+  const SCALES = [0.85, 1, 1.2, 1.4, 1.6];
   const SAN_RE = /^(O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?)[+#]?/;
   const RESULT_RE = /^(1-0|0-1|½-½|1\/2-1\/2)$/;
   const CLASS_INFO = {
@@ -121,7 +122,11 @@
     panel.innerHTML = `
       <div class="crb-head">
         <span class="crb-title">♞ 勝率分析</span>
-        <button class="crb-min" title="收合">–</button>
+        <span class="crb-tools">
+          <button class="crb-smaller" title="縮小">A−</button>
+          <button class="crb-bigger" title="放大">A+</button>
+          <button class="crb-min" title="收合">–</button>
+        </span>
       </div>
       <div class="crb-body">
         <div class="crb-status"></div>
@@ -134,8 +139,22 @@
         <label class="crb-toggle"><input type="checkbox" class="crb-best-toggle"> 顯示最佳著法 <kbd>Alt+B</kbd></label>
         <button class="crb-report">📊 賽後總結</button>
       </div>`;
+    panel.style.zoom = settings.panelScale;
     document.body.appendChild(panel);
+    chrome.storage.local.get('panelPos').then(({ panelPos }) => {
+      if (!panelPos || !panel) return;
+      panel.style.left = `${Math.min(Math.max(0, panelPos.left), window.innerWidth - 80)}px`;
+      panel.style.top = `${Math.min(Math.max(0, panelPos.top), window.innerHeight - 40)}px`;
+      panel.style.right = 'auto';
+    });
 
+    const resize = (dir) => {
+      const i = SCALES.indexOf(settings.panelScale);
+      const next = SCALES[Math.max(0, Math.min(SCALES.length - 1, (i < 0 ? 1 : i) + dir))];
+      chrome.storage.sync.set({ panelScale: next });
+    };
+    panel.querySelector('.crb-smaller').addEventListener('click', () => resize(-1));
+    panel.querySelector('.crb-bigger').addEventListener('click', () => resize(1));
     panel.querySelector('.crb-min').addEventListener('click', () => {
       panel.classList.toggle('crb-collapsed');
     });
@@ -150,16 +169,19 @@
     let sx, sy, ox, oy;
     handle.addEventListener('mousedown', (e) => {
       if (e.target.closest('button')) return;
+      // 面板有 zoom，left/top 以縮放前的座標計算。
+      const z = Number(el.style.zoom) || 1;
       const r = el.getBoundingClientRect();
-      sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+      sx = e.clientX; sy = e.clientY; ox = r.left / z; oy = r.top / z;
       const move = (ev) => {
-        el.style.left = `${ox + ev.clientX - sx}px`;
-        el.style.top = `${oy + ev.clientY - sy}px`;
+        el.style.left = `${ox + (ev.clientX - sx) / z}px`;
+        el.style.top = `${oy + (ev.clientY - sy) / z}px`;
         el.style.right = 'auto';
       };
       const up = () => {
         document.removeEventListener('mousemove', move);
         document.removeEventListener('mouseup', up);
+        chrome.storage.local.set({ panelPos: { left: parseFloat(el.style.left) * z, top: parseFloat(el.style.top) * z } });
       };
       document.addEventListener('mousemove', move);
       document.addEventListener('mouseup', up);
@@ -167,23 +189,25 @@
   }
 
   function setStatus(text, kind = '') {
+    if (!panel) return;
     const s = panel.querySelector('.crb-status');
     s.textContent = text;
     s.className = `crb-status ${kind}`;
   }
 
-  function render(mode) {
-    if (!panel) buildPanel();
-    panel.hidden = !settings.enabled || mode === 'none';
-    panel.classList.toggle('crb-blocked', mode === 'blocked');
-    panel.querySelector('.crb-best-toggle').checked = settings.showBestMove;
-    panel.querySelector('.crb-report').disabled = mode === 'blocked';
+  // 對局進行中、沒有棋局或已停用時，把面板和箭頭整個從頁面移除，不留任何元素。
+  function removePanel() {
+    panel?.remove();
+    panel = null;
+    clearArrow();
+  }
 
-    if (mode === 'blocked') {
-      setStatus('對局進行中：分析已停用。賽後會自動開啟。', 'crb-warn');
-      clearArrow();
-      return;
-    }
+  function render(mode) {
+    if (!settings.enabled || (mode !== 'analysis' && mode !== 'review')) return removePanel();
+    if (!panel) buildPanel();
+    panel.style.zoom = settings.panelScale;
+    panel.querySelector('.crb-best-toggle').checked = settings.showBestMove;
+
     const r = lastResult;
     if (!r) return;
 
@@ -282,11 +306,7 @@
   // ---------- 主流程 ----------
 
   async function update() {
-    if (!settings.enabled) {
-      if (panel) panel.hidden = true;
-      clearArrow();
-      return;
-    }
+    if (!settings.enabled) return removePanel();
     const mode = pageMode();
     if (mode !== 'analysis' && mode !== 'review') {
       lastKey = '';
@@ -370,6 +390,10 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync') return;
     for (const [k, v] of Object.entries(changes)) settings[k] = v.newValue;
+    if (Object.keys(changes).every((k) => k === 'panelScale')) {
+      if (panel) panel.style.zoom = settings.panelScale;
+      return;
+    }
     lastKey = '';
     schedule();
   });

@@ -5,6 +5,7 @@ export const DEFAULT_SETTINGS = {
   showArrow: true,
   liveDepth: 16,
   reportDepth: 14,
+  panelScale: 1,
 };
 
 export async function loadSettings() {

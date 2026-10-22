@@ -2,26 +2,27 @@
   position: fixed;
   top: 80px;
   right: 16px;
-  width: 250px;
+  width: 300px;
   z-index: 2147483000;
   background: #262421;
   color: #e8e6e3;
   border: 1px solid #3c3a37;
   border-radius: 8px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
-  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
 }
-#crb-panel[hidden] { display: none; }
 #crb-panel .crb-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
+  padding: 8px 12px;
   cursor: move;
   border-bottom: 1px solid #3c3a37;
   user-select: none;
 }
-#crb-panel .crb-title { font-weight: 600; }
+#crb-panel .crb-title { font-weight: 600; font-size: 15px; }
+#crb-panel .crb-tools { display: flex; gap: 4px; }
+#crb-panel .crb-tools button { min-width: 28px; height: 24px; font-size: 12px; padding: 0 4px; }
 #crb-panel button {
   font: inherit;
   color: inherit;
@@ -31,18 +32,13 @@
   cursor: pointer;
 }
 #crb-panel button:disabled { opacity: 0.4; cursor: not-allowed; }
-#crb-panel .crb-min { width: 22px; height: 22px; }
 #crb-panel.crb-collapsed .crb-body { display: none; }
-#crb-panel .crb-body { padding: 8px 10px 10px; display: grid; gap: 8px; }
+#crb-panel .crb-body { padding: 10px 12px 12px; display: grid; gap: 10px; }
 #crb-panel .crb-status { font-size: 11px; color: #9e9b98; }
 #crb-panel .crb-status.crb-warn { color: #f0b35a; font-size: 12px; }
-#crb-panel.crb-blocked .crb-eval,
-#crb-panel.crb-blocked .crb-last,
-#crb-panel.crb-blocked .crb-best,
-#crb-panel.crb-blocked .crb-toggle { display: none; }
 #crb-panel .crb-bar {
   position: relative;
-  height: 18px;
+  height: 28px;
   background: #403d39;
   border-radius: 4px;
   overflow: hidden;
@@ -58,26 +54,26 @@
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: #7a7672;
   mix-blend-mode: difference;
 }
-#crb-panel .crb-wins { display: flex; justify-content: space-between; font-size: 12px; margin-top: 2px; }
+#crb-panel .crb-wins { display: flex; justify-content: space-between; font-size: 16px; font-weight: 700; margin-top: 4px; }
 #crb-panel .crb-badge {
   display: inline-block;
-  padding: 0 6px;
+  padding: 1px 7px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 12px;
   color: #fff;
   font-weight: 600;
 }
-#crb-panel .crb-delta { font-size: 12px; color: #c9c6c2; }
+#crb-panel .crb-delta { font-size: 14px; color: #c9c6c2; }
 #crb-panel .crb-delta.crb-neg { color: #f08a7e; }
-#crb-panel .crb-why { font-size: 12px; color: #f0d9a8; margin-top: 2px; }
-#crb-panel .crb-muted { font-size: 12px; color: #9e9b98; }
-#crb-panel .crb-best { color: #7fb8ff; font-size: 12px; }
-#crb-panel .crb-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+#crb-panel .crb-why { font-size: 13px; color: #f0d9a8; margin-top: 2px; }
+#crb-panel .crb-muted { font-size: 13px; color: #9e9b98; }
+#crb-panel .crb-best { color: #7fb8ff; font-size: 14px; }
+#crb-panel .crb-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
 #crb-panel kbd {
   margin-left: auto;
   font-size: 10px;
@@ -86,7 +82,7 @@
   border-radius: 3px;
   color: #9e9b98;
 }
-#crb-panel .crb-report { padding: 6px; font-weight: 600; background: #81b64c; color: #fff; }
+#crb-panel .crb-report { padding: 8px; font-weight: 600; background: #81b64c; color: #fff; }
 
 #crb-arrow {
   position: absolute;
