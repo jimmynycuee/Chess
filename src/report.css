@@ -475,3 +475,7 @@ select {
 .coach-title { min-width: 0; }
 /* 棋子移動動畫 */
 .sq .pc.moving { z-index: 6; transition: transform 0.25s ease; }
+
+.demo-btn { margin-left: 6px; font-weight: 700; color: var(--blue); background: rgba(74, 158, 255, 0.12); }
+.demo-btn:hover:not(:disabled) { background: rgba(74, 158, 255, 0.22); }
+.demo-btn.on { color: #fff; background: var(--blue); }

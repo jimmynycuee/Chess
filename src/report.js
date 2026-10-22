@@ -63,6 +63,11 @@ let pausedAt = null; // 播放時停在哪個關鍵時刻
 const PLAY_DELAY = 1100;
 let pendingAnim = null; // 下一次畫棋盤時要播放的移動：[{ from, to }]
 let pendingSound = null; // 跟著動畫一起播放的音效（該步的 SAN）
+let demo = null; // Show Moves 演示：{ id, fens, moves, idx, timer, done }
+const demoSources = new Map(); // 按鈕 id → { fen, combo }
+let demoSeq = 0;
+const DEMO_STEP = 900;
+const DEMO_HOLD = 5000;
 
 // ---------- 音效：直接載入 chess.com 的音效檔，載不到就用合成音 ----------
 
@@ -273,9 +278,11 @@ const pieceSet = () => (PIECE_SETS.includes(settings.pieceSet) ? settings.pieceS
 
 // chess.com 的棋子圖不放進專案，直接從 chess.com 網站載入（只在自己的瀏覽器裡顯示）；載不到就改用 papercut。
 const CHESSCOM_PIECES = 'https://images.chesscomfiles.com/chess-themes/pieces/neo/150/';
+let chesscomFailed = false; // 載不到一次就整個改用 papercut，不用每次重畫都再試
 function pieceSrc(color, type) {
-  if (pieceSet() === 'chesscom') return `${CHESSCOM_PIECES}${color}${type.toLowerCase()}.png`;
-  return `../pieces/${pieceSet()}/${color}${type.toUpperCase()}.svg`;
+  if (pieceSet() === 'chesscom' && !chesscomFailed) return `${CHESSCOM_PIECES}${color}${type.toLowerCase()}.png`;
+  const set = pieceSet() === 'chesscom' ? 'papercut' : pieceSet();
+  return `../pieces/${set}/${color}${type.toUpperCase()}.svg`;
 }
 document.addEventListener(
   'error',
@@ -283,6 +290,7 @@ document.addEventListener(
     const img = e.target;
     if (img.tagName !== 'IMG' || !img.src.startsWith(CHESSCOM_PIECES)) return;
     const name = img.src.slice(CHESSCOM_PIECES.length, -4); // 例如 wp
+    chesscomFailed = true;
     img.src = `../pieces/papercut/${name[0]}${name[1].toUpperCase()}.svg`;
   },
   true
@@ -495,12 +503,79 @@ function render() {
   else if (explore) renderExplore();
   else if (lineView) renderLine();
   else renderReview();
+  if (demo) drawDemo();
+}
+
+// ---------- Show Moves：把 Best Move 之後的連續手法走給你看 ----------
+
+function startDemo(id) {
+  const src = demoSources.get(id);
+  if (!src) return;
+  stopPlay();
+  const key = `${src.fen}|${src.combo.join(' ')}`;
+  if (demo?.key === key) return cancelDemo();
+  cancelDemo(false);
+  const chess = new Chess(src.fen);
+  const dfens = [src.fen];
+  const dmoves = [];
+  for (const uci of src.combo) {
+    const m = chess.moves({ verbose: true }).find((x) => x.from + x.to === uci.slice(0, 4));
+    if (!m) break;
+    chess.move(m);
+    dfens.push(chess.fen());
+    dmoves.push({ uci, san: m.san });
+  }
+  if (!dmoves.length) return;
+  picked = null;
+  demo = { key, fens: dfens, moves: dmoves, idx: 0, done: false, timer: setTimeout(stepDemo, 500) };
+  drawDemo();
+  updateDemoButtons();
+}
+
+function stepDemo() {
+  if (!demo) return;
+  const mv = demo.moves[demo.idx];
+  demo.idx++;
+  pendingAnim = slidesFor(mv.uci);
+  pendingSound = mv.san;
+  drawDemo();
+  if (demo.idx < demo.moves.length) {
+    demo.timer = setTimeout(stepDemo, DEMO_STEP);
+  } else {
+    demo.done = true;
+    demo.timer = setTimeout(() => cancelDemo(), DEMO_HOLD);
+  }
+  updateDemoButtons();
+}
+
+function drawDemo() {
+  const last = demo.idx ? demo.moves[demo.idx - 1] : null;
+  drawBoard({ fen: demo.fens[demo.idx], highlight: last ? [last.uci.slice(0, 2), last.uci.slice(2, 4)] : [] });
+}
+
+// 結束演示並回到原本的局面
+function cancelDemo(redraw = true) {
+  if (!demo) return;
+  clearTimeout(demo.timer);
+  demo = null;
+  updateDemoButtons();
+  if (redraw) render();
+}
+
+function updateDemoButtons() {
+  document.querySelectorAll('.demo-btn').forEach((b) => {
+    const active = demo && b.dataset.key === demo.key;
+    b.classList.toggle('on', !!active);
+    if (!active) b.textContent = 'Show Moves';
+    else if (demo.done) b.textContent = '演示完畢（5 秒後回到原局面）';
+    else b.textContent = `演示中 ${demo.idx}/${demo.moves.length}・點一下停止`;
+  });
 }
 
 // 目前局面的 Best Move 區塊（藍色）。
 function bestNowHtml(next, label = 'Best Move') {
   return `<div class="better best-now">
-    <div class="line"><span class="legend-arrow" style="background:var(--blue)"></span>${label}：<b>${escapeHtml(next.san)}</b></div>
+    <div class="line"><span class="legend-arrow" style="background:var(--blue)"></span>${label}：<b>${escapeHtml(next.san)}</b> ${demoButton(next)}</div>
     <ul class="why">${next.reasons.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
     ${next.line ? `<div class="muted small">接下來的變化：${escapeHtml(next.line)}</div>` : ''}</div>`;
 }
@@ -508,12 +583,21 @@ function bestNowHtml(next, label = 'Best Move') {
 function setCoach(title, html) {
   $('#coach-title').innerHTML = title;
   $('#coach-body').innerHTML = html;
+  updateDemoButtons();
+}
+
+function demoButton(better) {
+  if (!better?.fen || !better.combo?.length) return '';
+  const id = `d${++demoSeq}`;
+  demoSources.set(id, { fen: better.fen, combo: better.combo });
+  if (demoSources.size > 50) demoSources.delete(demoSources.keys().next().value);
+  return `<button class="small-btn demo-btn" data-demo="${id}" data-key="${better.fen}|${better.combo.join(' ')}">Show Moves</button>`;
 }
 
 // 「更好的著法」區塊：著法、為什麼好（最多三點）、接下來的變化。
 function betterHtml(better, label = 'Best Move') {
   return `<div class="better">
-    <div class="line"><span class="legend-arrow" style="background:#3ba55d"></span>${label}：<b>${escapeHtml(better.san)}</b></div>
+    <div class="line"><span class="legend-arrow" style="background:#3ba55d"></span>${label}：<b>${escapeHtml(better.san)}</b> ${demoButton(better)}</div>
     <ul class="why">${better.reasons.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
     <div class="muted small">接下來的變化：${escapeHtml(better.line)}</div>
   </div>`;
@@ -650,6 +734,7 @@ function solve(uci, feedback, showAnswerArrow = false, fenAfter = null) {
 
 function leaveModes() {
   stopPlay();
+  cancelDemo(false);
   practice = null;
   explore = null;
   lineView = null;
@@ -959,6 +1044,8 @@ function renderExplore() {
 }
 
 $('#coach-body').addEventListener('click', (e) => {
+  const db = e.target.closest('[data-demo]');
+  if (db) return startDemo(db.dataset.demo);
   if (e.target.closest('[data-review="replay"]')) return startReplayHere();
   const b = e.target.closest('button[data-ex]');
   if (b && explore) {
@@ -1051,6 +1138,7 @@ function renderLine() {
 
 // 目前可以操作的局面；不能操作時回傳 null。
 function boardFen() {
+  if (demo) return null;
   if (practice) return practice.solved || practice.busy ? null : fens[practice.ply - 1];
   if (explore) {
     if (explore.busy) return null;
@@ -1618,6 +1706,7 @@ function tick() {
 }
 
 function togglePlay() {
+  cancelDemo(false);
   if (playing) return stopPlay();
   if (practice || explore || lineView) {
     leaveModes();
@@ -1634,6 +1723,7 @@ function togglePlay() {
 
 function nav(dir) {
   stopPlay();
+  cancelDemo(false);
   pausedAt = null;
   if (practice) {
     const ply = practice.ply;

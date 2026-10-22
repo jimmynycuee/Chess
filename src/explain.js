@@ -368,5 +368,22 @@ export function explainBest({ fenBefore, before, mover, playedAfter = null }) {
     reasons,
     line,
     hints: [hint1, `動你的${P}（${m.from}）。`, `答案是 ${m.san}。`],
+    // 給 Show Moves 演示用：起始局面與這一串連續手法
+    fen: fenBefore,
+    combo: comboLine(fenBefore, pv, theme === 'quiet' ? 4 : 8),
   };
+}
+
+// 從引擎變化中取出要演示的連續手法：到最後一次吃子／將軍／升變之後，再多走一步對方的回應。
+function comboLine(fen, pv, max) {
+  const chess = new Chess(fen);
+  const out = [];
+  let lastTactic = 0;
+  for (const uci of pv.slice(0, max)) {
+    const m = uciMove(chess, uci);
+    if (!m) break;
+    out.push(uci);
+    if (m.captured || m.promotion || m.san.includes('+') || m.san.includes('#')) lastTactic = out.length;
+  }
+  return out.slice(0, Math.min(out.length, Math.max(3, lastTactic + 1)));
 }
