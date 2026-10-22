@@ -1,6 +1,13 @@
 // 在 chess.com 頁面上讀取著法列表、判斷是否允許分析，並顯示浮動面板。
 // 真人對局進行中一律不分析（chess.com Fair Play 規則，友誼賽也一樣）。
 (() => {
+  // 插件更新後，新版會自動注入到已開的分頁；先清掉舊版留下的面板，舊版看到後也會自己停下來。
+  const INSTANCE = String(Math.random());
+  document.documentElement.dataset.crbInstance = INSTANCE;
+  document.getElementById('crb-panel')?.remove();
+  document.getElementById('crb-arrow')?.remove();
+  const alive = () => !!chrome.runtime?.id && document.documentElement.dataset.crbInstance === INSTANCE;
+
   const DEFAULTS = {
     enabled: true,
     showBestMove: false,
@@ -235,6 +242,7 @@
   }
 
   function render(mode) {
+    if (!alive()) return;
     if (!settings.enabled || (mode !== 'analysis' && mode !== 'review')) return removePanel();
     if (!panel) buildPanel();
     panel.style.zoom = settings.panelScale;
@@ -370,6 +378,8 @@
   }
 
   async function update() {
+    // 已經有新版接手這個頁面，舊版就什麼都不做
+    if (!alive()) return;
     harvestPieces();
     if (!settings.enabled) return removePanel();
     const mode = pageMode();
@@ -409,7 +419,7 @@
     try {
       res = await chrome.runtime.sendMessage({ type: 'live', sans, depth: settings.liveDepth });
     } catch (e) {
-      setStatus('引擎連線失敗，請重新整理頁面', 'crb-warn');
+      setStatus(chrome.runtime?.id ? '引擎連線失敗，請重新整理頁面' : '插件剛更新過，請重新整理這個頁面（F5）', 'crb-warn');
       return;
     }
     if (!res || res.stale || key !== lastKey) return;
@@ -486,10 +496,17 @@
     settings = { ...DEFAULTS, ...s };
     // 忽略面板與箭頭自己造成的變動，避免無限重繪。
     const own = (n) => n.nodeType === 1 && (n.id === 'crb-panel' || n.id === 'crb-arrow' || n.closest?.('#crb-panel, #crb-arrow'));
-    new MutationObserver((records) => {
+    const observer = new MutationObserver((records) => {
+      // 舊版（插件已更新或已移除）就停止，不再動頁面
+      if (!alive()) {
+        observer.disconnect();
+        if (document.documentElement.dataset.crbInstance === INSTANCE) setStatus('插件剛更新過，請重新整理這個頁面（F5）', 'crb-warn');
+        return;
+      }
       if (records.every((r) => own(r.target) || [...r.addedNodes, ...r.removedNodes].some(own))) return;
       schedule();
-    }).observe(document.body, {
+    });
+    observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,

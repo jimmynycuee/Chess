@@ -1,5 +1,5 @@
 // 常駐的 offscreen 文件：持有 Stockfish worker，替內容腳本分析目前局面。
-import { Engine } from './engine.js';
+import { Engine, analyseAll, poolSize } from './engine.js';
 import { replay, evaluateMove, whiteWinPercent, formatScore, uciLineToSan } from './analysis.js';
 import { explainMistake, explainBest } from './explain.js';
 
@@ -68,7 +68,7 @@ async function live({ sans, depth }) {
 
 // ---------- 賽後預先分析：用另一個引擎，不影響即時分析 ----------
 
-let preEngine = null;
+let preEngines = null; // 幾個引擎平行分析，加快速度
 let preJob = null;
 
 async function prepare({ key, sans, depth, existing }) {
@@ -76,18 +76,20 @@ async function prepare({ key, sans, depth, existing }) {
   if (preJob) preJob.cancelled = true;
   const job = { key, cancelled: false };
   preJob = job;
-  if (!preEngine) preEngine = new Engine();
+  preEngines ||= Array.from({ length: poolSize() }, () => new Engine());
   const { fens } = replay(sans);
-  const evals = existing?.evals?.slice(0, fens.length) || [];
-  for (let i = evals.length; i < fens.length; i++) {
-    if (job.cancelled) return;
-    evals.push(await preEngine.analyse(fens[i], { depth, multipv: 2 }));
-    const done = evals.length === fens.length;
-    // 每幾步回報一次進度，由 background 存進 storage（offscreen 文件不能直接用 storage）
-    if (done || evals.length % 4 === 0) {
-      chrome.runtime.sendMessage({ type: 'pre-progress', key, data: { done, count: evals.length, total: fens.length, evals } });
-    }
-  }
+  const total = fens.length;
+  // 進度由 background 存進 storage（offscreen 文件不能直接用 storage）
+  const report = (count, evals) =>
+    chrome.runtime.sendMessage({ type: 'pre-progress', key, data: { done: count === total, count, total, evals } });
+  const evals = await analyseAll(preEngines, fens, { depth, multipv: 2 }, {
+    start: existing?.evals || [],
+    isCancelled: () => job.cancelled,
+    onProgress: (count, prefix) => {
+      if (count < total && count % 4 === 0) report(count, prefix);
+    },
+  });
+  if (!job.cancelled) report(total, evals);
   if (preJob === job) preJob = null;
 }
 

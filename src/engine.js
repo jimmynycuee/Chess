@@ -94,3 +94,32 @@ export class Engine {
     };
   }
 }
+
+// 同時開幾個引擎：留一個核心給瀏覽器，最多 4 個。
+export function poolSize() {
+  return Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1));
+}
+
+// 用多個引擎平行分析一串局面，結果照原本的順序排好。
+// start：已經分析好的前幾個局面；onProgress(完成數, 從頭連續完成的結果)
+export async function analyseAll(engines, fens, opts, { start = [], onProgress, isCancelled } = {}) {
+  const out = start.slice(0, fens.length);
+  let next = out.length;
+  let done = out.length;
+  const prefix = () => {
+    let k = 0;
+    while (k < fens.length && out[k]) k++;
+    return out.slice(0, k);
+  };
+  const work = async (engine) => {
+    while (next < fens.length) {
+      if (isCancelled?.()) return;
+      const i = next++;
+      out[i] = await engine.analyse(fens[i], opts);
+      done++;
+      onProgress?.(done, prefix());
+    }
+  };
+  await Promise.all(engines.map(work));
+  return out;
+}

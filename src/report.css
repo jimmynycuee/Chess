@@ -476,6 +476,25 @@ select {
 /* 棋子移動動畫 */
 .sq .pc.moving { z-index: 6; transition: transform 0.25s ease; }
 
-.demo-btn { margin-left: 6px; font-weight: 700; color: var(--blue); background: rgba(74, 158, 255, 0.12); }
-.demo-btn:hover:not(:disabled) { background: rgba(74, 158, 255, 0.22); }
-.demo-btn.on { color: #fff; background: var(--blue); }
+.demo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0 8px;
+  padding: 5px 12px 5px 9px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--blue);
+  border-radius: 6px;
+  box-shadow: 0 2px 0 #2f6fc0;
+  vertical-align: middle;
+  animation: demo-hint 2.4s ease-in-out 2;
+}
+.demo-btn svg { width: 14px; height: 14px; fill: #fff; }
+.demo-btn:hover:not(:disabled) { background: #63adff; }
+.demo-btn.on { background: #2f6fc0; box-shadow: none; animation: none; }
+@keyframes demo-hint {
+  0%, 100% { box-shadow: 0 2px 0 #2f6fc0, 0 0 0 0 rgba(74, 158, 255, 0.6); }
+  50% { box-shadow: 0 2px 0 #2f6fc0, 0 0 0 6px rgba(74, 158, 255, 0); }
+}

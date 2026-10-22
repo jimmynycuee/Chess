@@ -1,5 +1,5 @@
 import { Chess } from '../vendor/chess.js';
-import { Engine } from './engine.js';
+import { Engine, analyseAll, poolSize } from './engine.js';
 import { loadSettings, preKey } from './settings.js';
 import {
   replay,
@@ -219,10 +219,15 @@ async function analyseGame() {
   let out = [];
   if (pre?.done && pre.evals?.length === fens.length) out = pre.evals;
   else if (pre) out = await waitForPrep(key);
-  for (let i = out.length; i < fens.length; i++) {
-    showProgress(i, 'Stockfish 分析中…');
-    // 多算第二好的走法，用來找「唯一好棋」
-    out.push(await getEngine().analyse(fens[i], { depth: settings.reportDepth, multipv: 2 }));
+  if (out.length < fens.length) {
+    // 幾個引擎平行分析（第一個之後留著給練習、試走用）
+    const pool = [getEngine(), ...Array.from({ length: poolSize() - 1 }, () => new Engine())];
+    showProgress(out.length, 'Stockfish 分析中…');
+    out = await analyseAll(pool, fens, { depth: settings.reportDepth, multipv: 2 }, {
+      start: out,
+      onProgress: (count) => showProgress(count, 'Stockfish 分析中…'),
+    });
+    pool.slice(1).forEach((e) => e.worker.terminate());
   }
   game.analysis = { v: ANALYSIS_VERSION, depth: settings.reportDepth, evals: out };
   await chrome.storage.local.set({ [id]: game });
@@ -573,9 +578,11 @@ function updateDemoButtons() {
   document.querySelectorAll('.demo-btn').forEach((b) => {
     const active = demo && b.dataset.key === demo.key;
     b.classList.toggle('on', !!active);
-    if (!active) b.textContent = 'Show Moves';
-    else if (demo.done) b.textContent = '演示完畢（5 秒後回到原局面）';
-    else b.textContent = `演示中 ${demo.idx}/${demo.moves.length}・點一下停止`;
+    const label = b.querySelector('span');
+    if (!label) return;
+    if (!active) label.textContent = 'Show Moves';
+    else if (demo.done) label.textContent = '演示完畢（5 秒後回到原局面）';
+    else label.textContent = `演示中 ${demo.idx}/${demo.moves.length}・點一下停止`;
   });
 }
 
@@ -598,7 +605,7 @@ function demoButton(better) {
   const id = `d${++demoSeq}`;
   demoSources.set(id, { fen: better.fen, combo: better.combo });
   if (demoSources.size > 50) demoSources.delete(demoSources.keys().next().value);
-  return `<button class="small-btn demo-btn" data-demo="${id}" data-key="${better.fen}|${better.combo.join(' ')}">Show Moves</button>`;
+  return `<button class="demo-btn" data-demo="${id}" data-key="${better.fen}|${better.combo.join(' ')}" title="在棋盤上演示這步之後的連續手法"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg><span>Show Moves</span></button>`;
 }
 
 // 「更好的著法」區塊：著法、為什麼好（最多三點）、接下來的變化。

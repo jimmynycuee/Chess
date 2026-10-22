@@ -102,6 +102,20 @@ async function savePieces(template) {
   await chrome.storage.local.set({ pieceImages: { template, theme, imgs, at: Date.now() } });
 }
 
+// 安裝或更新插件後，把新版注入已經開著的 chess.com 分頁，不用手動重新整理。
+chrome.runtime.onInstalled.addListener(async ({ reason }) => {
+  if (reason !== 'update') return;
+  const tabs = await chrome.tabs.query({ url: 'https://www.chess.com/*' });
+  for (const tab of tabs) {
+    try {
+      await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['src/content.css'] });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content.js'] });
+    } catch {
+      // 分頁可能已經關閉或還在載入，略過
+    }
+  }
+});
+
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === 'toggle-best-move') {
     const s = await loadSettings();

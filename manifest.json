@@ -3,7 +3,7 @@
   "name": "Chess Review Buddy",
   "version": "0.1.0",
   "description": "在 chess.com 的分析棋盤、對電腦與賽後頁面顯示勝率變化、最佳著法與賽後總結。真人對局進行中自動停用。",
-  "permissions": ["storage", "offscreen"],
+  "permissions": ["storage", "offscreen", "scripting"],
   "host_permissions": ["https://www.chess.com/*", "https://images.chesscomfiles.com/*"],
   "background": {
     "service_worker": "src/background.js",
