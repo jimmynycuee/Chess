@@ -27,6 +27,8 @@ chess.com 的 Fair Play 規則禁止在任何真人對局中使用引擎輔助�
   - **錯誤統計**：你犯的錯分類（送子、被捉雙、讓對手殺棋…）與漏看的戰術機會
   - **下一步練什麼**：依這盤的弱點連到 Lichess 免費主題謎題
   - 雙方準確率、勝率走勢圖（標出三個階段）、棋盤重播（← → 鍵）
+  - **試走**：在棋盤上直接拖曳（或點擊）棋子試其他下法，每一步都會評分、說明好壞，可撤回、看當下最好的下法、回到實戰
+  - 棋子可在設定中選擇：立體的 papercut（預設）、spatial，或經典平面的 cburnett
   - 匯出含評分與白話註解的 PGN、複製文字摘要（方便貼給朋友討論）
 - 即時面板在你下錯時也會顯示一句原因
 
@@ -51,7 +53,7 @@ src/
   insights.js                開局辨識、三階段表現、好棋、錯誤統計、對局故事、練習建議
   report.html / .js / .css   賽後總結頁
   popup.html / .js           設定（深度、開關）
-pieces/                      棋子圖（Lichess cburnett，GPLv2+）
+pieces/                      棋子圖（papercut、spatial、cburnett，授權見 pieces/LICENSES.md）
 tools/build-openings.mjs     由 lichess-org/chess-openings 產生 vendor/openings.json
 vendor/
   stockfish.js / .wasm       Stockfish 17.1 lite single-thread（GPLv3）
@@ -69,4 +71,4 @@ vendor/
 ## 授權
 
 本專案包含 Stockfish（GPLv3），因此整體以 GPLv3 散布。見 `vendor/STOCKFISH-LICENSE.txt`。
-棋子圖為 Colin M.L. Burnett 的 cburnett 棋子（取自 Lichess，GPLv2 或更新版本）。
+棋子圖取自 Lichess：papercut（Nikolay Anzarov，CC BY 4.0）、spatial（Maurizio Monge，MIT）、cburnett（Colin M.L. Burnett，GPLv2+），詳見 `pieces/LICENSES.md`。

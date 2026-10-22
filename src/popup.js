@@ -14,3 +14,7 @@ for (const key of ['liveDepth', 'reportDepth']) {
   el.addEventListener('input', () => (out.textContent = el.value));
   el.addEventListener('change', () => chrome.storage.sync.set({ [key]: Number(el.value) }));
 }
+
+const pieceSel = document.getElementById('pieceSet');
+pieceSel.value = s.pieceSet;
+pieceSel.addEventListener('change', () => chrome.storage.sync.set({ pieceSet: pieceSel.value }));

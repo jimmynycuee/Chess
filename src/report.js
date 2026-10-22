@@ -45,7 +45,11 @@ let me = game.me || 'w';
 let sel = moves.length;
 let flipped = me === 'b';
 let practice = null;
+let explore = null; // 試走模式：{ base, fens, evals, steps, busy, showBest }
+let picked = null; // 目前選取（或拖曳中）的棋子所在格
 let engine = null;
+const PIECE_SETS = ['papercut', 'spatial', 'cburnett'];
+const pieceSet = () => (PIECE_SETS.includes(settings.pieceSet) ? settings.pieceSet : 'papercut');
 
 $('#title').textContent = `${game.white} vs ${game.black}`;
 $('#sub').textContent = `${game.result} · ${moves.length} 個半步 · ${new Date(game.date).toLocaleString()}`;
@@ -196,7 +200,7 @@ function renderPhases() {
 $('#phases').addEventListener('click', (e) => {
   const el = e.target.closest('[data-ply]');
   if (el) {
-    practice = null;
+    leaveModes();
     select(Number(el.dataset.ply));
   }
 });
@@ -220,7 +224,7 @@ function renderGoods() {
 $('#goods').addEventListener('click', (e) => {
   const li = e.target.closest('li[data-ply]');
   if (li) {
-    practice = null;
+    leaveModes();
     select(Number(li.dataset.ply));
   }
 });
@@ -255,7 +259,7 @@ function renderStats() {
 $('#stats').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip[data-ply]');
   if (chip) {
-    practice = null;
+    leaveModes();
     select(Number(chip.dataset.ply));
     $('#board-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -297,7 +301,7 @@ $('#lessons').addEventListener('click', (e) => {
   const s = e.target.closest('[data-show]');
   if (p) startPractice(Number(p.dataset.practice));
   if (s) {
-    practice = null;
+    leaveModes();
     select(Number(s.dataset.show));
     $('#board-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -332,7 +336,7 @@ $('#opp').addEventListener('click', (e) => {
   if (p) return startPractice(Number(p.dataset.practice));
   const li = e.target.closest('li[data-ply]');
   if (li) {
-    practice = null;
+    leaveModes();
     select(Number(li.dataset.ply));
   }
 });
@@ -397,7 +401,7 @@ function renderChart() {
     svg.querySelector('.hover').setAttribute('x2', -10);
   });
   svg.addEventListener('click', (ev) => {
-    practice = null;
+    leaveModes();
     select(plyAt(ev));
   });
 }
@@ -432,14 +436,14 @@ function drawBoard({ fen, highlight = [], selected = null, targets = [], arrow =
       const coordF = vr === 7 ? `<span class="coord f">${sq[0]}</span>` : '';
       const coordR = vf === 0 ? `<span class="coord r">${sq[1]}</span>` : '';
       const piece = p
-        ? `<img class="pc" src="../pieces/${p === p.toUpperCase() ? 'w' : 'b'}${p.toUpperCase()}.svg" alt="${p}" draggable="false">`
+        ? `<img class="pc" src="../pieces/${pieceSet()}/${p === p.toUpperCase() ? 'w' : 'b'}${p.toUpperCase()}.svg" alt="${p}" draggable="false">`
         : '';
       html += `<div class="${cls}" data-sq="${sq}">${coordR}${coordF}${piece}</div>`;
     }
   }
   if (arrow) html += arrowSvg(arrow.uci, arrow.color);
   $('#board').innerHTML = html;
-  $('#board').classList.toggle('interactive', !!practice && !practice.solved);
+  $('#board').classList.toggle('interactive', !!boardFen());
 }
 
 function arrowSvg(uci, color) {
@@ -458,20 +462,28 @@ function arrowSvg(uci, color) {
     <line x1="${x1}" y1="${y1}" x2="${ex}" y2="${ey}" stroke="${color}" stroke-opacity="0.85" stroke-width="2.2" stroke-linecap="round" marker-end="url(#ah)"/></svg>`;
 }
 
+function targetsOf(fen) {
+  return picked ? new Chess(fen).moves({ square: picked, verbose: true }).map((m) => m.to) : [];
+}
+
 function renderPosition() {
   if (practice) return renderPractice();
+  if (explore) return renderExplore();
   const played = sel > 0 ? results[sel - 1] : null;
   const showBetter = played && played.better && !['best', 'book'].includes(played.cls);
   drawBoard({
     fen: fens[sel],
     highlight: played ? [played.uci.slice(0, 2), played.uci.slice(2, 4)] : [],
-    arrow: showBetter && played.bestUci ? { uci: played.bestUci, color: '#3ba55d' } : null,
+    selected: picked,
+    targets: targetsOf(fens[sel]),
+    arrow: !picked && showBetter && played.bestUci ? { uci: played.bestUci, color: '#3ba55d' } : null,
   });
 
   $('#pos-title').textContent = played ? moveLabel(played) : '起始局面';
   const info = $('#pos-info');
+  const tryHint = '<div class="muted small try-hint">💡 可以直接在棋盤上拖曳棋子，試走其他下法。</div>';
   if (!played) {
-    info.innerHTML = `<div class="line">白方勝率 ${winW[0].toFixed(0)}%</div>`;
+    info.innerHTML = `<div class="line">白方勝率 ${winW[0].toFixed(0)}%</div>${tryHint}`;
     return;
   }
   let html = `<div class="line">${badge(played.cls)} ${played.missed ? missedTag : ''}
@@ -483,7 +495,7 @@ function renderPosition() {
   if (showBetter) {
     html += betterHtml(played.better);
   }
-  info.innerHTML = html;
+  info.innerHTML = html + tryHint;
 }
 
 // 「更好的著法」區塊：著法、為什麼好（最多三點）、接下來的變化。
@@ -501,7 +513,9 @@ function startPractice(ply) {
   const r = results[ply - 1];
   if (!r || !r.better) return;
   flipped = r.color === 'b';
-  practice = { ply, r, hints: 0, solved: false, selected: null, busy: false, feedback: null };
+  explore = null;
+  picked = null;
+  practice = { ply, r, hints: 0, solved: false, busy: false, feedback: null };
   sel = ply - 1;
   updateCursor();
   renderPractice();
@@ -509,18 +523,14 @@ function startPractice(ply) {
 }
 
 function renderPractice() {
-  const { ply, r, solved, selected, feedback, hints } = practice;
+  const { ply, r, solved, feedback, hints } = practice;
   const fen = fens[ply - 1];
   const prev = results[ply - 2];
-  let targets = [];
-  if (selected) {
-    targets = new Chess(fen).moves({ square: selected, verbose: true }).map((m) => m.to);
-  }
   drawBoard({
     fen: solved ? practice.solvedFen : fen,
     highlight: solved ? [practice.solvedUci.slice(0, 2), practice.solvedUci.slice(2, 4)] : prev ? [prev.uci.slice(0, 2), prev.uci.slice(2, 4)] : [],
-    selected,
-    targets,
+    selected: solved ? null : picked,
+    targets: solved ? [] : targetsOf(fen),
     arrow: solved && practice.showAnswerArrow ? { uci: r.bestUci, color: '#3ba55d' } : null,
   });
 
@@ -533,7 +543,7 @@ function renderPractice() {
   const next = idx >= 0 ? lessons[idx + 1] : null;
 
   let html = `<div class="practice">
-    <div class="line">${escapeHtml(intro)} <span class="muted small">點棋子，再點目的地。</span></div>`;
+    <div class="line">${escapeHtml(intro)} <span class="muted small">拖曳棋子，或點棋子再點目的地。</span></div>`;
   if (feedback) html += `<div class="feedback ${feedback.kind}">${escapeHtml(feedback.text)}</div>`;
   if (solved) html += betterHtml(r.better);
   if (hints && !solved) {
@@ -558,29 +568,207 @@ $('#pos-info').addEventListener('click', (e) => {
   if (act === 'next') return startPractice(Number(b.dataset.ply));
   if (act === 'exit') {
     const ply = practice.ply;
-    practice = null;
+    leaveModes();
     return select(ply);
   }
   renderPractice();
 });
 
-$('#board').addEventListener('click', async (e) => {
+// ---------- 棋盤操作：拖曳或點擊 ----------
+
+// 目前可以操作的局面；不能操作時回傳 null。
+function boardFen() {
+  if (practice) return practice.solved || practice.busy ? null : fens[practice.ply - 1];
+  if (explore) return explore.busy ? null : explore.fens.at(-1);
+  return fens[sel];
+}
+
+function rerender() {
+  if (practice) renderPractice();
+  else renderPosition();
+}
+
+function tryMove(from, to) {
+  const fen = boardFen();
+  if (!fen || !from) return false;
+  const legal = new Chess(fen).moves({ square: from, verbose: true }).find((m) => m.to === to);
+  if (!legal) return false;
+  const uci = from + to + (legal.promotion ? 'q' : '');
+  picked = null;
+  if (practice) checkAnswer(uci, legal.san);
+  else exploreMove(legal, uci);
+  return true;
+}
+
+let drag = null;
+
+$('#board').addEventListener('pointerdown', (e) => {
+  const fen = boardFen();
   const cell = e.target.closest('[data-sq]');
-  if (!cell || !practice || practice.solved || practice.busy) return;
+  if (!fen || !cell || e.button !== 0) return;
   const sq = cell.dataset.sq;
-  const chess = new Chess(fens[practice.ply - 1]);
+  const chess = new Chess(fen);
   const piece = chess.get(sq);
   if (piece && piece.color === chess.turn()) {
-    practice.selected = practice.selected === sq ? null : sq;
-    return renderPractice();
+    e.preventDefault();
+    const wasPicked = picked === sq;
+    picked = sq;
+    rerender();
+    const img = $(`#board [data-sq="${sq}"] .pc`);
+    const rect = img.getBoundingClientRect();
+    const ghost = img.cloneNode();
+    ghost.className = 'pc-ghost';
+    ghost.style.width = ghost.style.height = `${rect.width}px`;
+    ghost.style.left = `${e.clientX - rect.width / 2}px`;
+    ghost.style.top = `${e.clientY - rect.height / 2}px`;
+    document.body.append(ghost);
+    img.classList.add('lifted');
+    drag = { from: sq, ghost, size: rect.width, wasPicked, x0: e.clientX, y0: e.clientY, moved: false };
+    $('#board').setPointerCapture(e.pointerId);
+  } else if (picked) {
+    drag = { target: sq };
   }
-  if (!practice.selected) return;
-  const legal = chess.moves({ square: practice.selected, verbose: true }).find((m) => m.to === sq);
-  const from = practice.selected;
-  practice.selected = null;
-  if (!legal) return renderPractice();
-  const uci = from + sq + (legal.promotion ? 'q' : '');
-  await checkAnswer(uci, legal.san);
+});
+
+$('#board').addEventListener('pointermove', (e) => {
+  if (!drag?.ghost) return;
+  drag.ghost.style.left = `${e.clientX - drag.size / 2}px`;
+  drag.ghost.style.top = `${e.clientY - drag.size / 2}px`;
+  if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 4) drag.moved = true;
+});
+
+function endDrag(e, cancelled = false) {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+  if (d.ghost) {
+    d.ghost.remove();
+    const to = cancelled ? null : document.elementFromPoint(e.clientX, e.clientY)?.closest('#board [data-sq]')?.dataset.sq;
+    if (to && to !== d.from && tryMove(d.from, to)) return;
+    // 拖到不合法的格子就放回原位；原地第二次點同一個子則取消選取
+    if (d.moved || d.wasPicked) picked = null;
+    return rerender();
+  }
+  if (d.target && !cancelled && !tryMove(picked, d.target)) {
+    picked = null;
+    rerender();
+  }
+}
+$('#board').addEventListener('pointerup', (e) => endDrag(e));
+$('#board').addEventListener('pointercancel', (e) => endDrag(e, true));
+
+// ---------- 試走模式 ----------
+
+function leaveModes() {
+  practice = null;
+  explore = null;
+  picked = null;
+}
+
+async function exploreMove(m, uci) {
+  // 走的正好是實戰的下一步，就直接沿著實戰前進
+  if (!explore && sel < moves.length && results[sel].uci === uci) return select(sel + 1);
+  if (!explore) explore = { base: sel, fens: [fens[sel]], evals: [evals[sel]], steps: [], busy: false, showBest: false };
+  const ex = explore;
+  const chess = new Chess(ex.fens.at(-1));
+  chess.move({ from: m.from, to: m.to, promotion: uci[4] });
+  const step = { san: m.san, uci, color: m.color };
+  ex.steps.push(step);
+  ex.fens.push(chess.fen());
+  ex.busy = true;
+  ex.showBest = false;
+  renderExplore();
+
+  const k = ex.steps.length - 1;
+  const res = await getEngine().analyse(chess.fen(), { depth: Math.min(settings.reportDepth, 14) });
+  if (explore !== ex || ex.steps[k] !== step) return; // 已經離開或撤回
+  ex.evals.push(res);
+  const before = ex.evals[k];
+  step.result = evaluateMove({ before, after: res, move: step, ply: ex.base + k + 1 });
+  step.why = BAD.includes(step.result.cls)
+    ? explainMistake({ fenBefore: ex.fens[k], uci, after: res, mover: step.color }).map((x) => x.text)
+    : [];
+  step.better =
+    step.result.cls !== 'best' ? explainBest({ fenBefore: ex.fens[k], before, mover: step.color, playedAfter: res.score }) : null;
+  step.next = explainBest({ fenBefore: chess.fen(), before: res, mover: chess.turn() });
+  ex.busy = false;
+  renderExplore();
+}
+
+function undoExplore() {
+  if (!explore || explore.busy) return;
+  explore.steps.pop();
+  explore.fens.pop();
+  explore.evals.length = Math.min(explore.evals.length, explore.fens.length);
+  explore.showBest = false;
+  picked = null;
+  if (!explore.steps.length) {
+    const base = explore.base;
+    explore = null;
+    return select(base);
+  }
+  renderExplore();
+}
+
+function renderExplore() {
+  const ex = explore;
+  const last = ex.steps.at(-1);
+  const fen = ex.fens.at(-1);
+  const next = last.next;
+  drawBoard({
+    fen,
+    highlight: [last.uci.slice(0, 2), last.uci.slice(2, 4)],
+    selected: picked,
+    targets: targetsOf(fen),
+    arrow: !picked && ex.showBest && next ? { uci: ex.evals.at(-1).bestmove, color: '#4a9eff' } : null,
+  });
+
+  const baseLabel = ex.base ? moveLabel(results[ex.base - 1]) : '起始局面';
+  $('#pos-title').textContent = `🔀 試走（從 ${baseLabel} 之後）`;
+  const line = ex.steps
+    .map((st, i) => {
+      const ply = ex.base + 1 + i;
+      const num = st.color === 'w' ? `${Math.ceil(ply / 2)}. ` : i === 0 ? `${Math.ceil(ply / 2)}... ` : '';
+      return `${num}${st.san}`;
+    })
+    .join(' ');
+
+  let html = `<div class="line">你的變化：<b>${escapeHtml(line)}</b></div>`;
+  if (ex.busy) {
+    html += '<div class="muted">分析中…</div>';
+  } else {
+    const r = last.result;
+    html += `<div class="line">${badge(r.cls)} ${sideName(r.color)}勝率 ${moverWin(r.winBeforeW, r.color).toFixed(0)}% → ${moverWin(r.winAfterW, r.color).toFixed(0)}%
+      <span class="muted">（評分 ${formatScore(ex.evals.at(-1).score)}）</span></div>`;
+    if (last.why.length) html += `<ul class="why">${last.why.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`;
+    if (last.better && !['best', 'book', 'excellent'].includes(r.cls)) html += betterHtml(last.better);
+    if (ex.showBest && next) {
+      html += `<div class="better best-now">
+        <div class="line"><span class="legend-arrow" style="background:#4a9eff"></span>現在${sideName(new Chess(fen).turn())}最好的下法：<b>${escapeHtml(next.san)}</b></div>
+        <ul class="why">${next.reasons.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+        <div class="muted small">接下來的變化：${escapeHtml(next.line)}</div></div>`;
+    }
+  }
+  html += `<div class="lesson-actions">
+    <button data-ex="undo" ${ex.busy ? 'disabled' : ''}>↶ 撤回一步</button>
+    ${next && !ex.busy ? `<button data-ex="best">${ex.showBest ? '隱藏最佳下法' : '💡 現在最好的下法'}</button>` : ''}
+    <button data-ex="exit">回到實戰</button></div>`;
+  $('#pos-info').innerHTML = html;
+}
+
+$('#pos-info').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-ex]');
+  if (!b || !explore) return;
+  if (b.dataset.ex === 'undo') undoExplore();
+  if (b.dataset.ex === 'best') {
+    explore.showBest = !explore.showBest;
+    renderExplore();
+  }
+  if (b.dataset.ex === 'exit') {
+    const base = explore.base;
+    leaveModes();
+    select(base);
+  }
 });
 
 async function checkAnswer(uci, san) {
@@ -638,7 +826,7 @@ function renderMoves() {
 $('#moves').addEventListener('click', (e) => {
   const mv = e.target.closest('.mv');
   if (mv) {
-    practice = null;
+    leaveModes();
     select(Number(mv.dataset.ply));
   }
 });
@@ -725,7 +913,7 @@ $('#me-toggle').addEventListener('click', async (e) => {
   if (!b || b.dataset.me === me) return;
   me = b.dataset.me;
   flipped = me === 'b';
-  practice = null;
+  leaveModes();
   game.me = me;
   await chrome.storage.local.set({ [id]: game });
   renderAll();
@@ -734,7 +922,8 @@ $('#me-toggle').addEventListener('click', async (e) => {
 document.querySelector('.nav').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-nav]');
   if (!b) return;
-  practice = null;
+  if (explore && b.dataset.nav === 'prev') return undoExplore();
+  leaveModes();
   select({ first: 0, prev: sel - 1, next: sel + 1, last: moves.length }[b.dataset.nav]);
 });
 $('#flip').addEventListener('click', () => {
@@ -743,6 +932,10 @@ $('#flip').addEventListener('click', () => {
 });
 document.addEventListener('keydown', (e) => {
   if (practice) return;
+  if (explore) {
+    if (e.key === 'ArrowLeft') undoExplore();
+    return;
+  }
   if (e.key === 'ArrowLeft') select(sel - 1);
   if (e.key === 'ArrowRight') select(sel + 1);
 });
@@ -760,5 +953,12 @@ function renderAll() {
   renderMoves();
   select(sel);
 }
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'sync' && changes.pieceSet) {
+    settings.pieceSet = changes.pieceSet.newValue;
+    rerender();
+  }
+});
 
 renderAll();

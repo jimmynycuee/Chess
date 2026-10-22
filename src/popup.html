@@ -22,6 +22,11 @@
     <label>在棋盤上畫箭頭 <input type="checkbox" id="showArrow"></label>
     <label>即時分析深度 <span><input type="range" id="liveDepth" min="10" max="22"> <b id="liveDepthVal"></b></span></label>
     <label>賽後總結深度 <span><input type="range" id="reportDepth" min="10" max="20"> <b id="reportDepthVal"></b></span></label>
+    <label>賽後總結的棋子 <select id="pieceSet">
+      <option value="papercut">立體（papercut）</option>
+      <option value="spatial">立體（spatial）</option>
+      <option value="cburnett">經典平面（cburnett）</option>
+    </select></label>
   </section>
   <p class="note">只在分析棋盤、對電腦，以及對局結束後出現。真人對局（包含友誼賽）進行中，面板會從頁面上完全移除，以符合 chess.com 的 Fair Play 規則。</p>
   <script type="module" src="popup.js"></script>

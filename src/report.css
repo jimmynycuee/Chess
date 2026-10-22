@@ -123,7 +123,24 @@ button:disabled { opacity: 0.5; cursor: default; }
 .sq.l { background: var(--sq-light); }
 .sq.d { background: var(--sq-dark); }
 .sq.hl::before { content: ""; position: absolute; inset: 0; background: var(--hl); }
-.sq .pc { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+.sq .pc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 1.5px rgba(0, 0, 0, 0.35));
+}
+.sq .pc.lifted { opacity: 0.3; }
+.board { touch-action: none; }
+.pc-ghost {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.45));
+  transform: scale(1.08);
+}
 .sq .coord { position: absolute; z-index: 2; font-size: 11px; font-weight: 700; line-height: 1; }
 .sq.l .coord { color: var(--sq-dark); }
 .sq.d .coord { color: var(--sq-light); }
@@ -186,6 +203,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 
 /* 練習用棋盤 */
 .board.interactive .sq { cursor: pointer; }
+.board.interactive .sq:has(.pc) { cursor: grab; }
 .sq.sel::before { content: ""; position: absolute; inset: 0; background: rgba(20, 85, 30, 0.5); }
 .sq.dot::after { content: ""; position: absolute; left: 36%; top: 36%; width: 28%; height: 28%; z-index: 2; border-radius: 50%; background: rgba(0, 0, 0, 0.22); }
 .sq.cap::after { content: ""; position: absolute; inset: 4%; border-radius: 50%; border: 5px solid rgba(0, 0, 0, 0.22); z-index: 2; }
@@ -245,3 +263,6 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 
 /* 走勢圖上的階段標籤 */
 .phase-label { position: absolute; top: 4px; transform: translateX(4px); font-size: 11px; color: #cfccc8; pointer-events: none; }
+
+.try-hint { margin-top: 6px; }
+.best-now { border-left-color: #4a9eff; }
