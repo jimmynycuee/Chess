@@ -13,6 +13,11 @@
       <div id="sub" class="muted"></div>
     </div>
     <div class="actions">
+      <div class="seg" id="me-toggle" role="group" aria-label="我執哪一方">
+        <span class="muted">我是</span>
+        <button data-me="w">白方</button>
+        <button data-me="b">黑方</button>
+      </div>
       <button id="copy" disabled>複製文字摘要</button>
       <button id="pgn" disabled>匯出 PGN（含註解）</button>
     </div>
@@ -24,12 +29,12 @@
     <section class="cards" id="cards"></section>
 
     <section class="panel">
-      <h2>勝率走勢 <span class="muted small">（白方勝率；點圖可跳到該步）</span></h2>
-      <div id="chart" class="chart"></div>
+      <h2>本局最重要的課</h2>
+      <div id="lessons" class="lessons"></div>
     </section>
 
     <div class="grid">
-      <section class="panel">
+      <section class="panel" id="board-panel">
         <div class="board-head">
           <h2 id="pos-title">局面</h2>
           <div class="nav">
@@ -45,12 +50,17 @@
       </section>
 
       <section class="panel">
-        <h2>關鍵時刻</h2>
-        <ol id="moments" class="moments"></ol>
+        <h2>對手的失誤 <span class="muted small">（你有沒有抓住機會？）</span></h2>
+        <ul id="opp" class="opp"></ul>
         <h2>著法</h2>
         <div id="moves" class="moves"></div>
       </section>
     </div>
+
+    <section class="panel">
+      <h2>勝率走勢 <span class="muted small">（白方勝率；點圖可跳到該步）</span></h2>
+      <div id="chart" class="chart"></div>
+    </section>
   </main>
   <script type="module" src="report.js"></script>
 </body>

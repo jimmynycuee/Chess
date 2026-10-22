@@ -1,6 +1,7 @@
 // 常駐的 offscreen 文件：持有 Stockfish worker，替內容腳本分析目前局面。
 import { Engine } from './engine.js';
 import { replay, evaluateMove, whiteWinPercent, formatScore, uciLineToSan } from './analysis.js';
+import { explainMistake } from './explain.js';
 
 const engine = new Engine();
 const cache = new Map();
@@ -49,6 +50,9 @@ async function live({ sans, depth }) {
     if (!before || isStale()) return { stale: true };
     const ev = evaluateMove({ before, after: cur, move: moves[moves.length - 1], ply: moves.length });
     ev.bestSan = before.bestmove ? uciLineToSan(prevFen, [before.bestmove])[0] : null;
+    if (['inaccuracy', 'mistake', 'blunder'].includes(ev.cls)) {
+      ev.why = explainMistake({ fenBefore: prevFen, uci: ev.uci, after: cur, mover: ev.color })[0] || null;
+    }
     result.last = ev;
   }
   return result;

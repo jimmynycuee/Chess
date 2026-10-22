@@ -98,9 +98,9 @@
     // 上方是對手、下方是自己；未翻轉時下方是白方。
     if (names.length >= 2) {
       const [top, bottom] = names;
-      return flipped ? { white: top, black: bottom } : { white: bottom, black: top };
+      return flipped ? { white: top, black: bottom, me: 'b' } : { white: bottom, black: top, me: 'w' };
     }
-    return { white: '白方', black: '黑方' };
+    return { white: '白方', black: '黑方', me: flipped ? 'b' : 'w' };
   }
 
   function readResult() {
@@ -213,6 +213,12 @@
       line2.textContent = `${moverName}勝率 ${before.toFixed(0)}% → ${after.toFixed(0)}%（${sign}${Math.abs(d).toFixed(1)}）`;
       line2.classList.toggle('crb-neg', d < -2);
       last.append(line1, line2);
+      if (r.last.why) {
+        const why = document.createElement('div');
+        why.className = 'crb-why';
+        why.textContent = r.last.why;
+        last.append(why);
+      }
       if (settings.showBestMove && r.last.cls !== 'best' && r.last.bestSan) {
         const line3 = document.createElement('div');
         line3.className = 'crb-muted';

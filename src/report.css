@@ -146,3 +146,53 @@ button:disabled { opacity: 0.5; cursor: default; }
 .moves .mv:hover { background: var(--bg); }
 .moves .mv.sel { background: var(--accent); color: #fff; }
 .moves .sym { font-weight: 700; }
+
+/* 視角切換 */
+.seg { display: flex; align-items: center; gap: 4px; margin-right: 8px; }
+.seg button { padding: 4px 10px; }
+.seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.tag {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #8a6fd1;
+}
+.tag.you { background: var(--accent); }
+.card.mine { border-color: var(--accent); }
+
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.small-btn { padding: 1px 8px; font-size: 12px; }
+
+/* 本局三課 */
+.lessons { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.lesson { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.lesson-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lesson-num { font-size: 12px; font-weight: 700; color: var(--accent); }
+.why { margin: 0; padding-left: 18px; }
+.why li { margin: 2px 0; }
+.lesson-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+.good-news { margin: 0; }
+
+/* 對手的失誤 */
+.opp { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 6px; }
+.opp li { cursor: pointer; }
+.opp .ok { color: var(--accent); font-weight: 600; }
+.opp .bad { color: #ca3431; font-weight: 600; }
+
+/* 練習用棋盤 */
+.board.interactive .sq { cursor: pointer; }
+.sq.sel::before { content: ""; position: absolute; inset: 0; background: rgba(20, 85, 30, 0.5); }
+.sq.dot::after { content: ""; position: absolute; width: 28%; height: 28%; border-radius: 50%; background: rgba(0, 0, 0, 0.22); }
+.sq.cap::after { content: ""; position: absolute; inset: 4%; border-radius: 50%; border: 5px solid rgba(0, 0, 0, 0.22); }
+.practice { display: grid; gap: 8px; }
+.feedback { padding: 6px 10px; border-radius: 6px; font-weight: 500; }
+.feedback.ok { background: rgba(93, 154, 50, 0.15); color: var(--accent); }
+.feedback.bad { background: rgba(202, 52, 49, 0.12); color: #ca3431; }
+.feedback.info { background: var(--bg); }
+.hints { margin: 0; padding-left: 20px; color: var(--muted); }
+
+.moves .mv.mine { font-weight: 600; }
