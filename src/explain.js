@@ -103,9 +103,9 @@ const R = (type, text) => ({ type, text });
 
 // 錯誤類型的中文名稱（賽後統計用）。
 export const MISTAKE_TYPES = {
-  mated: '讓對手有殺棋',
+  mated: '讓對手有 Checkmate',
   hang: '子沒保護好、被吃',
-  fork: '被對手捉雙',
+  fork: '被對手 Fork',
   threat: '漏看對手的威脅',
   material: '交換後吃虧',
   positional: '局面變差（沒有立即戰術）',
@@ -131,7 +131,7 @@ export function explainMistake({ fenBefore, uci, after, mover }) {
   const mateAgainst = mateFor(after.score, opp(mover));
   if (mateAgainst) {
     const line = sanLine(fenAfter, after.pv, Math.min(mateAgainst * 2 - 1, 5)) + (mateAgainst > 3 ? ' …' : '');
-    reasons.push(R('mated', mateAgainst === 1 ? `這步讓對手可以直接將死你（${line}）。` : `這步之後對手有 ${mateAgainst} 步殺：${line}。`));
+    reasons.push(R('mated', mateAgainst === 1 ? `這步讓對手可以直接 Checkmate（${line}）。` : `這步之後對手有 Mate in ${mateAgainst}：${line}。`));
     return reasons;
   }
 
@@ -151,7 +151,7 @@ export function explainMistake({ fenBefore, uci, after, mover }) {
     if (m) {
       const targets = forkTargets(c2, m.to);
       if (targets.length >= 2) {
-        reasons.push(R('fork', `對手可以走 ${m.san}，用${NAME[m.piece]}同時攻擊你的${list(targets.slice(0, 2))}（捉雙）。`));
+        reasons.push(R('fork', `對手可以走 ${m.san}，用${NAME[m.piece]}同時攻擊你的${list(targets.slice(0, 2))}（Fork）。`));
       } else if (m.captured && !reasons.length) {
         reasons.push(R('hang', `對手可以走 ${m.san} 吃掉你的${NAME[m.captured]}。`));
       } else if (!reasons.length) {
@@ -207,11 +207,11 @@ function linePressure(chess, sq) {
     if (!backAtRisk) continue;
     if (back.type === 'k' || VAL[back.type] > VAL[front.type]) {
       return back.type === 'k'
-        ? `牽制：對手的${NAME[front.type]}（${front.square}）不能動，因為後面是國王。`
-        : `牽制：對手的${NAME[front.type]}（${front.square}）動了，後面的${NAME[back.type]}（${back.square}）就會被吃。`;
+        ? `Pin：對手的${NAME[front.type]}（${front.square}）不能動，因為後面是國王。`
+        : `Pin：對手的${NAME[front.type]}（${front.square}）動了，後面的${NAME[back.type]}（${back.square}）就會被吃。`;
     }
     if ((front.type === 'k' || VAL[front.type] > VAL[back.type]) && VAL[back.type] >= 3) {
-      return `串擊：先攻擊對手的${NAME[front.type]}，它讓開之後就能吃到後面的${NAME[back.type]}（${back.square}）。`;
+      return `Skewer：先攻擊對手的${NAME[front.type]}，它讓開之後就能吃到後面的${NAME[back.type]}（${back.square}）。`;
     }
   }
   return null;
@@ -275,8 +275,8 @@ export function explainBest({ fenBefore, before, mover, playedAfter = null }) {
     if (!found.some((f) => f.theme === theme)) found.push({ theme, text });
   };
 
-  if (mate) add('mate', mate === 1 ? `${m.san} 直接將死！` : `${m.san} 開始可以 ${mate} 步將死對手：${line}。`);
-  if (m.promotion) add('promote', `兵走到底線升變成${NAME[m.promotion]}，多了一個強力的子。`);
+  if (mate) add('mate', mate === 1 ? `${m.san} 直接 Checkmate！` : `${m.san} 開始可以 Mate in ${mate}：${line}。`);
+  if (m.promotion) add('promote', `Promotion：兵走到底線變成${NAME[m.promotion]}，多了一個強力的子。`);
   if (m.captured && targetHanging) add('free', `可以直接吃掉對手沒保護好的${NAME[m.captured]}（${m.to}），白白多一個子。`);
   else if (m.captured && VAL[m.captured] > VAL[m.piece]) add('trade', `用${P}換對手更值錢的${NAME[m.captured]}，這筆交換你賺到。`);
   else if (m.captured && pieces(pre, mover).some((p) => pre.attackers(p.square, opp(mover)).includes(m.to))) {
@@ -287,18 +287,18 @@ export function explainBest({ fenBefore, before, mover, playedAfter = null }) {
   }
 
   const forks = forkTargets(chess, m.to);
-  if (forks.length >= 2) add('fork', `捉雙：${P}同時攻擊對手的${list(forks.slice(0, 2))}，對手只能救一個。`);
+  if (forks.length >= 2) add('fork', `Fork：${P}同時攻擊對手的${list(forks.slice(0, 2))}，對手只能救一個。`);
   const lineHit = linePressure(chess, m.to);
   if (lineHit) add('pin', lineHit);
   const disc = discoveredAttack(pre, chess, m.to, mover);
-  if (disc) add('discovered', `閃擊：${P}讓開路線，讓你的${NAME[disc.by.type]}攻擊對手的${NAME[disc.target.type]}（${disc.target.square}）。`);
+  if (disc) add('discovered', `Discovered Attack：${P}讓開路線，讓你的${NAME[disc.by.type]}攻擊對手的${NAME[disc.target.type]}（${disc.target.square}）。`);
 
   if (!mate && swing >= 2 && !found.some((f) => ['free', 'trade', 'fork', 'promote'].includes(f.theme))) {
     add('win', `照這個變化下去可以贏得約 ${swing} 分子力：${line}。`);
   }
 
   if (playedAfter && mateFor(playedAfter, opp(mover)) && !mateFor(before.score, opp(mover))) {
-    add('avoidmate', `避開了對手的殺棋：你實戰那步之後，對手有 ${mateFor(playedAfter, opp(mover))} 步殺。`);
+    add('avoidmate', `避開了對手的 Checkmate：你實戰那步之後，對手有 Mate in ${mateFor(playedAfter, opp(mover))}。`);
   }
   const hangingBefore = hangingPieces(pre, mover);
   const stillHanging = new Set(hangingPieces(chess, mover).map((p) => p.square));
@@ -320,15 +320,15 @@ export function explainBest({ fenBefore, before, mover, playedAfter = null }) {
 
   const moveNo = Number(fenBefore.split(' ')[5]);
   if (m.flags.includes('k') || m.flags.includes('q')) {
-    add('castle', '王車易位：國王躲到安全的角落，城堡也能出來參戰。');
+    add('castle', 'Castling：國王躲到安全的角落，城堡也能出來參戰。');
   } else if (moveNo <= 12 && (m.piece === 'n' || m.piece === 'b') && rankOf(m.from) === (mover === 'w' ? 0 : 7)) {
-    add('develop', `出子：把${P}從底線走出來，開局要盡快讓子都動起來。`);
+    add('develop', `Development：把${P}從底線走出來，開局要盡快讓子都動起來。`);
   }
   if (!m.captured && ['d4', 'd5', 'e4', 'e5'].includes(m.to) && (m.piece === 'p' || m.piece === 'n')) {
-    add('center', `佔領中心 ${m.to}：中心的子能控制更多格子，也讓其他子更好出動。`);
+    add('center', `Center：佔領中心 ${m.to}，中心的子能控制更多格子，也讓其他子更好出動。`);
   }
   if (m.piece === 'p' && !m.promotion && isPassedPawn(chess, m.to, mover)) {
-    add('passed', `推進通路兵：前面已經沒有對手的兵能擋，越接近升變越危險。`);
+    add('passed', `Passed Pawn：前面已經沒有對手的兵能擋，越接近底線越危險。`);
   }
   if (m.piece === 'k' && isEndgame(chess) && centerDist(m.to) < centerDist(m.from)) {
     add('king', '殘局中把國王走向中心：子少的時候，國王也是重要的戰力。');
@@ -342,15 +342,15 @@ export function explainBest({ fenBefore, before, mover, playedAfter = null }) {
   const reasons = found.slice(0, 3).map((f) => f.text);
   const theme = found[0].theme;
   const hint1 = {
-    mate: '這裡有殺棋！先看看所有能將軍的走法。',
+    mate: '這裡有 Checkmate！先看看所有能將軍的走法。',
     promote: '你的兵快到底線了。',
     free: '對手有一個子沒保護好，找找看。',
     trade: '看看有沒有划算的吃子。',
-    fork: '找找看有沒有能同時攻擊兩個子的走法。',
-    pin: '找一條直線或斜線，攻擊對手排在一起的兩個子。',
-    discovered: '移開一個子，讓後面的子發動攻擊。',
+    fork: '找找看有沒有 Fork：同時攻擊兩個子的走法。',
+    pin: '找一條直線或斜線，攻擊對手排在一起的兩個子（Pin / Skewer）。',
+    discovered: '移開一個子，讓後面的子發動攻擊（Discovered Attack）。',
     win: '這裡有辦法贏得子力，看看吃子和將軍的走法。',
-    avoidmate: '小心！對手有殺棋的威脅，先擋住它。',
+    avoidmate: '小心！對手有 Checkmate 的威脅，先擋住它。',
     defend: '你有子正被攻擊，先處理它。',
     threat: '找一步能攻擊對手子力的走法。',
     check: '看看將軍的走法。',

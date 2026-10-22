@@ -246,8 +246,16 @@ select {
   background: var(--panel-2);
   border-top: 1px solid var(--line);
 }
-.controls button[data-nav], .controls #flip { flex: 0 0 44px; padding: 8px 0; font-size: 16px; }
-.controls #replay { flex: 1; }
+.controls button[data-nav] { flex: 1; padding: 10px 0; font-size: 16px; }
+
+/* Best Move 開關 */
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; font-size: 13px; user-select: none; }
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch .knob { position: relative; width: 34px; height: 20px; border-radius: 10px; background: var(--raise); transition: background 0.15s; }
+.switch .knob::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #cfccc8; transition: transform 0.15s, background 0.15s; }
+.switch input:checked + .knob { background: var(--accent); }
+.switch input:checked + .knob::after { transform: translateX(14px); background: #fff; }
+.switch input:focus-visible + .knob { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 .block { background: var(--panel-2); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
 
@@ -383,7 +391,7 @@ select {
 .goods { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .goods li[data-ply] { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
 .goods li[data-ply]:hover b { text-decoration: underline; }
-.good-icon { font-size: 20px; line-height: 1.2; }
+.goods .tag { margin-left: 4px; }
 .lessons { display: grid; gap: 10px; }
 .lesson { background: var(--panel); border-radius: 8px; padding: 10px; display: grid; gap: 6px; }
 .lesson-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -432,6 +440,16 @@ select {
   #app { height: auto; grid-template-columns: 1fr; }
   .side { height: auto; }
   .tab-body { overflow: visible; }
-  .actions .ghost { display: none; }
+  .actions .ghost, .actions .seg .small { display: none; }
   .brand span { display: none; }
 }
+
+/* 復盤分頁：教練框與走勢圖固定，只有著法列表捲動 */
+@media (min-width: 961px) {
+  .tab-body:has(> .tab[data-tab="review"]:not([hidden])) { overflow: hidden; display: flex; flex-direction: column; }
+  .tab[data-tab="review"]:not([hidden]) { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+  .tab[data-tab="review"] .coach { flex: 0 1 auto; max-height: 62%; overflow-y: auto; }
+  .tab[data-tab="review"] .chart { flex: 0 0 auto; }
+  .tab[data-tab="review"] .moves { flex: 1 1 auto; min-height: 60px; overflow-y: auto; align-content: start; }
+}
+.phase-label.end { transform: translateX(calc(-100% - 4px)); }

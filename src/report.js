@@ -56,6 +56,7 @@ let practice = null; // 練習模式
 let explore = null; // 變化模式：free 試走、replay 重新下、drill 開局練習
 let lineView = null; // 看主線
 let picked = null; // 目前選取（或拖曳中）的棋子所在格
+let showBest = !!settings.reviewBestMove; // Best Move 常設開關（會記住）
 let engine = null;
 let oppEngine = null;
 let oppSkill = null;
@@ -161,7 +162,14 @@ function badge(cls) {
   return `<span class="badge" style="background:${c.color}">${c.label}</span>`;
 }
 
-const missedTag = '<span class="tag">錯失良機</span>';
+const missedTag = '<span class="tag">Miss</span>';
+
+// 說明文字都是以走子方為「你」寫的；如果走子方是對手，就把「你」和「對手」對調。
+function pov(text, color) {
+  if (color === me) return text;
+  return text.replace(/對手|你/g, (w) => (w === '你' ? '對手' : '你'));
+}
+const povBetter = (better, color) => better && { ...better, reasons: better.reasons.map((t) => pov(t, color)) };
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -306,7 +314,7 @@ function renderPlayers(fen) {
     return `<span class="avatar ${c}">${c === 'w' ? '♔' : '♚'}</span>
       <span>${escapeHtml(playerName(c))}</span>
       ${c === me ? '<span class="tag you">你</span>' : ''}
-      ${s.acc !== null ? `<span class="acc-chip" title="準確率">${s.acc.toFixed(1)}</span>` : ''}
+      ${s.acc !== null ? `<span class="acc-chip" title="Accuracy">${s.acc.toFixed(1)}</span>` : ''}
       ${adv > 0 ? `<span class="mat">+${adv}</span>` : ''}`;
   };
   const top = flipped ? 'w' : 'b';
@@ -338,7 +346,14 @@ function render() {
   else if (explore) renderExplore();
   else if (lineView) renderLine();
   else renderReview();
-  $('#replay').hidden = !!(practice || explore || lineView);
+}
+
+// 目前局面的 Best Move 區塊（藍色）。
+function bestNowHtml(next, label = 'Best Move') {
+  return `<div class="better best-now">
+    <div class="line"><span class="legend-arrow" style="background:var(--blue)"></span>${label}：<b>${escapeHtml(next.san)}</b></div>
+    <ul class="why">${next.reasons.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+    ${next.line ? `<div class="muted small">接下來的變化：${escapeHtml(next.line)}</div>` : ''}</div>`;
 }
 
 function setCoach(title, html) {
@@ -347,7 +362,7 @@ function setCoach(title, html) {
 }
 
 // 「更好的著法」區塊：著法、為什麼好（最多三點）、接下來的變化。
-function betterHtml(better, label = '更好的著法') {
+function betterHtml(better, label = 'Best Move') {
   return `<div class="better">
     <div class="line"><span class="legend-arrow" style="background:#3ba55d"></span>${label}：<b>${escapeHtml(better.san)}</b></div>
     <ul class="why">${better.reasons.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
@@ -358,28 +373,38 @@ function betterHtml(better, label = '更好的著法') {
 function renderReview() {
   const played = sel > 0 ? results[sel - 1] : null;
   const showBetter = played && played.better && !['best', 'book'].includes(played.cls);
+  const nowBest =
+    showBest && evals[sel].bestmove
+      ? explainBest({ fenBefore: fens[sel], before: evals[sel], mover: new Chess(fens[sel]).turn() })
+      : null;
+  let arrow = null;
+  if (!picked && nowBest) arrow = { uci: evals[sel].bestmove, color: '#4a9eff' };
+  else if (!picked && showBetter) arrow = { uci: played.bestUci, color: '#3ba55d' };
   drawBoard({
     fen: fens[sel],
     highlight: played ? [played.uci.slice(0, 2), played.uci.slice(2, 4)] : [],
     selected: picked,
     targets: targetsOf(fens[sel]),
-    arrow: !picked && showBetter ? { uci: played.bestUci, color: '#3ba55d' } : null,
+    arrow,
   });
   renderEvalBar(evals[sel].score);
 
-  const tryHint = '<div class="muted small">💡 可以直接拖曳棋子試走其他下法，或按下方「從這裡重新下」。</div>';
+  const tail = `<div class="muted small">可以直接拖曳棋子試走其他下法。</div>
+    <div class="actions-row"><button class="primary" data-review="replay">從這裡重新下</button></div>`;
+  const turn = new Chess(fens[sel]).turn();
+  const bestBlock = nowBest ? bestNowHtml(povBetter(nowBest, turn), `Best Move（輪到${sideName(turn)}）`) : '';
   if (!played) {
-    setCoach('起始局面', `<div class="line">白方勝率 ${winW[0].toFixed(0)}%</div>${tryHint}`);
+    setCoach('起始局面', `<div class="line">白方勝率 ${winW[0].toFixed(0)}%</div>${bestBlock}${tail}`);
     return;
   }
   const bookName = opening.bookPlies.has(played.ply) ? openingTable[posKey(fens[sel])]?.[1] : null;
   let html = `<div class="line">${sideName(played.color)}勝率 ${moverWin(played.winBeforeW, played.color).toFixed(0)}% → ${moverWin(played.winAfterW, played.color).toFixed(0)}%
-    <span class="muted">（評分 ${formatScore(evals[sel].score)}）</span></div>`;
-  if (bookName) html += `<div class="muted small">📖 開局庫：${escapeHtml(bookName)}</div>`;
+    <span class="muted">（Eval ${formatScore(evals[sel].score)}）</span></div>`;
+  if (bookName) html += `<div class="muted small">Book：${escapeHtml(bookName)}</div>`;
   if (played.missed) html += `<div class="line">${missedTag} 對手上一步下錯了，這裡有機會反擊。</div>`;
-  if (played.why.length) html += `<ul class="why">${played.why.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`;
-  if (showBetter) html += betterHtml(played.better);
-  setCoach(`${escapeHtml(moveLabel(played))} ${badge(played.cls)}`, html + tryHint);
+  if (played.why.length) html += `<ul class="why">${played.why.map((t) => `<li>${escapeHtml(pov(t, played.color))}</li>`).join('')}</ul>`;
+  if (showBetter) html += betterHtml(povBetter(played.better, played.color), `這步的 Best Move`);
+  setCoach(`${escapeHtml(moveLabel(played))} ${badge(played.cls)}`, html + bestBlock + tail);
 }
 
 // ---------- 練習模式（本局三課） ----------
@@ -418,18 +443,18 @@ function renderPractice() {
 
   let html = `<div class="line">${escapeHtml(intro)} <span class="muted small">拖曳棋子，或點棋子再點目的地。</span></div>`;
   if (feedback) html += `<div class="feedback ${feedback.kind}">${escapeHtml(feedback.text)}</div>`;
-  if (solved) html += betterHtml(r.better, '最好的走法');
+  if (solved) html += betterHtml(r.better);
   if (hints && !solved) {
     html += `<ol class="hints">${r.better.hints.slice(0, hints).map((h) => `<li>${escapeHtml(h)}</li>`).join('')}</ol>`;
   }
   html += '<div class="actions-row">';
   if (!solved) {
-    html += `<button data-act="hint" ${hints >= 2 ? 'disabled' : ''}>💡 提示（${hints}/2）</button>
+    html += `<button data-act="hint" ${hints >= 2 ? 'disabled' : ''}>提示（${hints}/2）</button>
       <button data-act="answer">看答案</button>`;
   }
   if (solved && next) html += `<button class="primary" data-act="next" data-ply="${next.ply}">下一課 →</button>`;
   html += '<button data-act="exit">結束練習</button></div>';
-  setCoach(`🧩 練習：${Math.ceil(ply / 2)}${r.color === 'w' ? '.' : '...'} 輪到${sideName(r.color)}`, html);
+  setCoach(`練習：${Math.ceil(ply / 2)}${r.color === 'w' ? '.' : '...'} 輪到${sideName(r.color)}`, html);
 }
 
 async function checkAnswer(uci, san) {
@@ -487,7 +512,7 @@ async function startVariation(kind, base, start = null) {
     evals: [start?.evalRes || evals[base]],
     steps: [],
     busy: false,
-    showBest: false,
+    redo: [],
     level,
     myColor: me,
     startLabel: start?.label || null,
@@ -591,8 +616,8 @@ async function exploreMove(m, uci) {
   }
   const ex = explore;
   const step = pushStep(ex, m, uci, 'me');
+  ex.redo = [];
   ex.busy = true;
-  ex.showBest = false;
   render();
   const ok = await analyseStep(ex, step, ex.steps.length - 1);
   if (!ok) return;
@@ -605,24 +630,32 @@ async function exploreMove(m, uci) {
   render();
 }
 
+// ◀：撤回一步（重新下／Opening 練習時，連同對手的回應一起撤回）。
 function undoExplore() {
   const ex = explore;
   if (!ex || ex.busy) return;
+  const group = [];
   const popOne = () => {
-    ex.steps.pop();
-    ex.fens.pop();
+    group.unshift({ step: ex.steps.pop(), fen: ex.fens.pop(), eval: ex.evals[ex.fens.length] });
     ex.evals.length = ex.fens.length;
   };
+  if (!ex.steps.length) {
+    if (ex.kind === 'free') {
+      const base = ex.base;
+      leaveModes();
+      select(base);
+    }
+    return;
+  }
   if (ex.kind === 'free') {
     popOne();
   } else {
-    // 撤回到上一次輪到自己走的時候
     while (ex.steps.length && ex.steps.at(-1).by === 'opp') popOne();
     if (ex.steps.length) popOne();
   }
-  ex.showBest = false;
+  ex.redo.push(group);
   picked = null;
-  if (!ex.steps.length && ex.kind === 'free') {
+  if (!ex.steps.length && ex.kind === 'free' && !ex.redo.length) {
     const base = ex.base;
     leaveModes();
     return select(base);
@@ -630,27 +663,70 @@ function undoExplore() {
   render();
 }
 
+// ▶：把撤回的步重新走回來。
+function redoExplore() {
+  const ex = explore;
+  if (!ex || ex.busy || !ex.redo.length) return;
+  for (const it of ex.redo.pop()) {
+    ex.steps.push(it.step);
+    ex.fens.push(it.fen);
+    ex.evals[ex.fens.length - 1] = it.eval;
+  }
+  picked = null;
+  render();
+}
+
+// Opening 練習：在哪一步離開開局庫（-1 表示還在開局庫裡）。
+function openingEndIndex(ex) {
+  return ex.steps.findIndex((st) => st.result && !st.book);
+}
+
+// Opening 練習時的 Best Move：照 Main Line 的下一步，沒有的話用引擎的首選。
+function drillBest(ex, fen, engineNext) {
+  const mainline = (guide?.variation?.line || guide?.line || '').split(' ').filter(Boolean);
+  const played = ex.steps.map((st) => st.san);
+  const follows = played.every((san, i) => mainline[i] === san);
+  const san = follows ? mainline[played.length] : null;
+  const book = san ? bookMoves(fen).find((b) => b.san === san) : null;
+  if (book) {
+    return {
+      san: book.san,
+      uci: book.uci,
+      reasons: [`Main Line：這是${guide.zh}的標準下法（${book.name}）。`, ...(engineNext?.san === book.san && engineNext.theme !== 'quiet' ? engineNext.reasons : [])],
+      line: '',
+    };
+  }
+  return engineNext ? { ...engineNext, uci: ex.evals[ex.fens.length - 1]?.bestmove } : null;
+}
+
 function renderExplore() {
   const ex = explore;
   const fen = ex.fens.at(-1);
   const last = ex.steps.at(-1);
-  const lastMine = [...ex.steps].reverse().find((s) => s.by === 'me' && s.result);
+  const lastMine = [...ex.steps].reverse().find((st) => st.by === 'me' && st.result);
   const nowEval = ex.evals[ex.fens.length - 1] || ex.evals[ex.evals.length - 1];
-  const next = last ? last.next : explainBest({ fenBefore: fen, before: ex.evals[0], mover: new Chess(fen).turn() });
+  const engineNext = last ? last.next : explainBest({ fenBefore: fen, before: ex.evals[0], mover: new Chess(fen).turn() });
+  const endIdx = ex.kind === 'drill' ? openingEndIndex(ex) : -1;
+  const inOpening = ex.kind === 'drill' && endIdx < 0;
+  const myTurn = ex.kind === 'free' || new Chess(fen).turn() === ex.myColor;
+  // Opening 練習時，Best Move 預設開啟直到開局結束
+  const wantBest = (showBest || inOpening) && myTurn && !ex.busy;
+  let best = null;
+  if (wantBest) best = inOpening ? drillBest(ex, fen, engineNext) : engineNext && { ...engineNext, uci: nowEval?.bestmove };
   drawBoard({
     fen,
     highlight: last ? [last.uci.slice(0, 2), last.uci.slice(2, 4)] : [],
     selected: picked,
     targets: targetsOf(fen),
-    arrow: !picked && ex.showBest && next && ex.evals[ex.fens.length - 1] ? { uci: ex.evals[ex.fens.length - 1].bestmove, color: '#4a9eff' } : null,
+    arrow: !picked && best?.uci ? { uci: best.uci, color: '#4a9eff' } : null,
   });
   if (nowEval) renderEvalBar(nowEval.score);
 
   const baseLabel = ex.startLabel || (ex.base ? moveLabel(results[ex.base - 1]) : '起始局面');
   const titles = {
-    free: `🔀 試走 <span class="muted small">從 ${escapeHtml(baseLabel)} 之後</span>`,
-    replay: `🔁 重新下 <span class="muted small">你執${sideName(ex.myColor)}・從 ${escapeHtml(baseLabel)} 之後</span>`,
-    drill: `📖 開局練習 <span class="muted small">${escapeHtml(guide?.zh || opening.zh || opening.family || '')}・你執${sideName(ex.myColor)}</span>`,
+    free: `試走 <span class="muted small">從 ${escapeHtml(baseLabel)} 之後</span>`,
+    replay: `重新下 <span class="muted small">你執${sideName(ex.myColor)}・從 ${escapeHtml(baseLabel)} 之後</span>`,
+    drill: `Opening 練習 <span class="muted small">${escapeHtml(guide?.zh || opening.zh || opening.family || '')}・你執${sideName(ex.myColor)}</span>`,
   };
 
   let html = '';
@@ -662,19 +738,14 @@ function renderExplore() {
     html += `<div class="line"><span class="big-win">你的勝率 ${myWin.toFixed(0)}%</span>
       <span class="feedback ${tone} small" style="padding:1px 6px">${d >= 0 ? '+' : ''}${d.toFixed(0)}（和起點相比）</span></div>`;
   }
-  if (ex.steps.length) {
-    const chips = numberedLine(ex.steps.map((s) => s.san), ex.base + 1)
-      .map((t, i) => {
-        const st = ex.steps[i];
-        const col = st.result && (st.by === 'me' || ex.kind === 'free') ? CLASSES[st.result.cls].color : 'transparent';
-        return `<span class="vm ${i === ex.steps.length - 1 ? 'cur' : ''}" style="border-bottom-color:${col}">${escapeHtml(t)}</span>`;
-      })
-      .join('');
-    html += `<div class="var-line">${chips}</div>`;
-  } else if (ex.kind === 'replay') {
-    html += '<div class="line">輪到你走。對手會先照實戰回應；你一旦走得跟實戰不一樣，就換電腦接手。</div>';
-  } else if (ex.kind === 'drill') {
-    html += '<div class="line">對手會照開局主線或開局庫回應。照著開局的想法走走看，每一步都會告訴你是不是常見下法。</div>';
+  if (!ex.steps.length) {
+    if (ex.kind === 'replay') html += '<div class="line">輪到你走。對手會先照實戰回應；你一旦走得跟實戰不一樣，就換電腦接手。</div>';
+    if (ex.kind === 'drill') html += '<div class="line">對手會照 Main Line 或 Book 回應。Opening 結束前會一直顯示 Best Move，照著走走看。</div>';
+  }
+  if (ex.kind === 'drill' && endIdx >= 0) {
+    const st = ex.steps[endIdx];
+    const ply = ex.base + endIdx + 1;
+    html += `<div class="feedback info">此 Opening 已結束：第 ${Math.ceil(ply / 2)} 步${st.by === 'me' ? '你' : '對手'}走 ${escapeHtml(st.san)} 之後離開了 Book。接下來進入 Middlegame，Best Move 依照上方開關顯示。</div>`;
   }
 
   if (ex.busy) {
@@ -685,45 +756,32 @@ function renderExplore() {
       const r = focus.result;
       html += `<div class="line">${ex.kind !== 'free' ? '你走的 ' : ''}<b>${escapeHtml(focus.san)}</b> ${badge(r.cls)}
         <span class="muted small">${sideName(r.color)}勝率 ${moverWin(r.winBeforeW, r.color).toFixed(0)}% → ${moverWin(r.winAfterW, r.color).toFixed(0)}%</span></div>`;
-      if (focus.book) html += `<div class="muted small">📖 常見下法：${escapeHtml(focus.book)}</div>`;
+      if (focus.book) html += `<div class="muted small">Book：${escapeHtml(focus.book)}</div>`;
       if (focus.why.length) html += `<ul class="why">${focus.why.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`;
-      if (focus.better && !['excellent', 'good'].includes(r.cls)) html += betterHtml(focus.better);
+      if (focus.better && !['excellent', 'good'].includes(r.cls)) html += betterHtml(focus.better, '這步的 Best Move');
     }
     if (ex.kind !== 'free' && last?.by === 'opp') {
       html += `<div class="line muted">對手回應 <b style="color:var(--fg)">${escapeHtml(last.san)}</b>（${escapeHtml(last.source)}）</div>`;
     }
     const pos = new Chess(fen);
-    if (pos.isGameOver()) html += `<div class="feedback info">${pos.isCheckmate() ? '將死，棋局結束。' : '棋局結束（和棋）。'}</div>`;
-    if (ex.showBest && next) {
-      html += `<div class="better best-now">
-        <div class="line"><span class="legend-arrow" style="background:var(--blue)"></span>現在最好的下法：<b>${escapeHtml(next.san)}</b></div>
-        <ul class="why">${next.reasons.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
-        <div class="muted small">接下來的變化：${escapeHtml(next.line)}</div></div>`;
-    }
+    if (pos.isGameOver()) html += `<div class="feedback info">${pos.isCheckmate() ? 'Checkmate，棋局結束。' : '棋局結束（和棋）。'}</div>`;
+    if (best) html += bestNowHtml(best);
   }
-  html += `<div class="actions-row">
-    <button data-ex="undo" ${ex.busy || !ex.steps.length ? 'disabled' : ''}>↶ 撤回</button>
-    ${next && !ex.busy ? `<button data-ex="best">${ex.showBest ? '隱藏提示' : '💡 最好的下法'}</button>` : ''}
-    ${ex.kind !== 'free'
-      ? `<select data-ex="level" title="電腦對手的強度">${Object.entries(LEVELS)
-          .map(([k, v]) => `<option value="${k}" ${k === ex.level ? 'selected' : ''}>電腦：${v.label}</option>`)
-          .join('')}</select>
-         <button data-ex="restart" ${ex.busy ? 'disabled' : ''}>重來</button>`
-      : ''}
-    <button data-ex="exit">${ex.kind === 'free' ? '回到實戰' : '結束'}</button></div>`;
+  html += '<div class="muted small">◀ 撤回一步　▶ 重走撤回的步</div><div class="actions-row">';
+  if (ex.kind !== 'free') {
+    html += `<select data-ex="level" title="電腦對手的強度">${Object.entries(LEVELS)
+      .map(([k, v]) => `<option value="${k}" ${k === ex.level ? 'selected' : ''}>電腦：${v.label}</option>`)
+      .join('')}</select>`;
+  }
+  html += `<button data-ex="exit">${ex.kind === 'free' ? '回到實戰' : '結束'}</button></div>`;
   setCoach(titles[ex.kind], html);
 }
 
 $('#coach-body').addEventListener('click', (e) => {
+  if (e.target.closest('[data-review="replay"]')) return startVariation('replay', sel);
   const b = e.target.closest('button[data-ex]');
   if (b && explore) {
     const act = b.dataset.ex;
-    if (act === 'undo') undoExplore();
-    if (act === 'best') {
-      explore.showBest = !explore.showBest;
-      render();
-    }
-    if (act === 'restart') startVariation(explore.kind, explore.base);
     if (act === 'exit') {
       leaveModes();
       select(sel);
@@ -790,16 +848,21 @@ function renderLine() {
     quickEval(fen).then((res) => {
       if (lineView === lv && lv.fens[lv.idx] === fen) renderEvalBar(res.score);
     });
-  const chips = numberedLine(lv.sans, 1)
-    .map((t, i) => `<button class="vm ${i + 1 === lv.idx ? 'cur' : ''}" data-line="${i + 1}">${escapeHtml(t)}</button>`)
-    .join('');
   const note = guide?.variation?.note || guide?.summary || '';
+  const cur = mv ? numberedLine(lv.sans, 1)[lv.idx - 1] : '起始局面';
+  const nextSan = lv.sans[lv.idx];
+  const nextUci = nextSan ? lv.moves[lv.idx].uci : null;
+  if (showBest && nextUci) {
+    $('#board').insertAdjacentHTML('beforeend', arrowSvg(nextUci, '#4a9eff'));
+  }
   setCoach(
-    `📖 主線 <span class="muted small">${escapeHtml(lv.title)}</span>`,
-    `<div class="var-line">${chips}</div>
+    `Main Line <span class="muted small">${escapeHtml(lv.title)}</span>`,
+    `<div class="line">第 ${lv.idx} / ${lv.sans.length} 步：<b>${escapeHtml(cur.replace(/^\d+\.+\s*/, ''))}</b></div>
      <div class="line">${escapeHtml(note)}</div>
+     ${showBest && nextSan ? `<div class="better best-now"><div class="line"><span class="legend-arrow" style="background:var(--blue)"></span>Main Line 下一步：<b>${escapeHtml(nextSan)}</b></div></div>` : ''}
+     ${!nextSan ? '<div class="feedback info">Main Line 到這裡結束。</div>' : ''}
      <div class="muted small">用 ◀ ▶ 或鍵盤方向鍵一步一步看；也可以直接拖曳棋子試別的下法。</div>
-     <div class="actions-row"><button class="primary" data-line="drill">📖 自己練習這個開局</button><button data-line="exit">結束</button></div>`
+     <div class="actions-row"><button class="primary" data-line="drill">練習這個 Opening</button><button data-line="exit">結束</button></div>`
   );
 }
 
@@ -901,7 +964,10 @@ function renderChart() {
     if (i > 0 && p !== phases[i - 1]) phaseLines.push(i);
   });
   const phaseLabels = [0, ...phaseLines]
-    .map((i) => `<span class="phase-label" style="left:${(x(i) / W) * 100}%">${PHASES[phases[i]] || ''}</span>`)
+    .map((i) => {
+      const left = (x(i) / W) * 100;
+      return `<span class="phase-label ${left > 80 ? 'end' : ''}" style="left:${left > 80 ? 100 : left}%">${PHASES[phases[i]] || ''}</span>`;
+    })
     .join('');
   const marks = results
     .filter((r) => BAD.includes(r.cls))
@@ -960,7 +1026,7 @@ function renderMoves() {
         continue;
       }
       const c = CLASSES[r.cls];
-      const sym = BAD.includes(r.cls) ? c.symbol : r.cls === 'book' ? '📖' : '';
+      const sym = BAD.includes(r.cls) || r.cls === 'book' ? c.symbol : '';
       html += `<div class="mv" data-ply="${r.ply}"><span>${escapeHtml(r.san)}</span>
         <span class="sym" style="color:${c.color}" title="${c.label}${r.missed ? '・錯失良機' : ''}">${sym}${r.missed ? '◇' : ''}</span></div>`;
     }
@@ -983,10 +1049,11 @@ function updateCursor() {
   cur?.setAttribute('x2', x);
   document.querySelectorAll('.mv').forEach((el) => el.classList.toggle('sel', Number(el.dataset.ply) === sel));
   const el = document.querySelector(`.mv[data-ply="${sel}"]`);
-  const box = $('.tab-body');
+  // 寬螢幕時只有著法列表會捲動；窄螢幕時整個面板一起捲
+  const box = $('#moves').scrollHeight > $('#moves').clientHeight ? $('#moves') : $('.tab-body');
   if (el && tab === 'review' && box.scrollHeight > box.clientHeight) {
     const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top;
-    if (top < 0 || top > box.clientHeight - 40) box.scrollTop += top - box.clientHeight / 2;
+    if (top < 0 || top > box.clientHeight - 30) box.scrollTop += top - box.clientHeight / 2;
   }
 }
 
@@ -1008,8 +1075,8 @@ function renderCards() {
     return `<div class="card ${color === me ? 'mine' : ''}">
       <div class="who"><span class="swatch" style="background:${color === 'w' ? '#fff' : '#1a1a1a'}"></span>
         ${escapeHtml(playerName(color))} ${color === me ? '<span class="tag you">你</span>' : ''}</div>
-      <div class="acc">${s.acc === null ? '–' : s.acc.toFixed(1)}<small> 準確率</small></div>
-      <table>${rows}<tr><td><span class="cls-dot" style="border:2px solid #8a6fd1"></span>錯失良機</td><td>${s.missed}</td></tr></table></div>`;
+      <div class="acc">${s.acc === null ? '–' : s.acc.toFixed(1)}<small> Accuracy</small></div>
+      <table>${rows}<tr><td><span class="cls-dot" style="border:2px solid #8a6fd1"></span>Miss</td><td>${s.missed}</td></tr></table></div>`;
   };
   $('#cards').innerHTML = card(me) + card(other(me));
 }
@@ -1030,9 +1097,9 @@ function renderPhases() {
       const weakest = mine.weakest === key;
       return `<div class="phase ${weakest ? 'weak' : ''}" ${s.worst ? `data-ply="${s.worst.ply}"` : ''}>
         <div class="phase-name">${name} ${weakest ? '<span class="tag warn">最需要加強</span>' : ''}</div>
-        <div class="phase-acc">${s.acc.toFixed(0)}<small>準確率</small></div>
+        <div class="phase-acc">${s.acc.toFixed(0)}<small>Accuracy</small></div>
         <div class="muted small">你走了 ${s.n} 步，${s.bad ? `有 ${s.bad} 步不精確以上` : '沒有明顯失誤'}</div>
-        <div class="muted small">對手：${o.acc === null ? '–' : o.acc.toFixed(0)}${key === 'opening' ? '・<a href="#" data-goto="opening" style="color:var(--accent)">看開局教學</a>' : ''}</div>
+        <div class="muted small">對手：${o.acc === null ? '–' : o.acc.toFixed(0)}${key === 'opening' ? '・<a href="#" data-goto="opening" style="color:var(--accent)">看 Opening 教學</a>' : ''}</div>
       </div>`;
     })
     .join('');
@@ -1049,11 +1116,10 @@ $('#phases').addEventListener('click', (e) => {
 
 function renderGoods() {
   const goods = goodMoves({ results, evals, fens, me, oppMistakeLoss: OPP_MISTAKE_LOSS });
-  const icon = { only: '🎯', punish: '⚡', sac: '💎' };
   $('#goods').innerHTML = goods.length
     ? goods
         .map(
-          (g) => `<li data-ply="${g.ply}"><span class="good-icon">${icon[g.kind]}</span>
+          (g) => `<li data-ply="${g.ply}">
             <div><b>${escapeHtml(moveLabel(results[g.ply - 1]))}</b> <span class="tag good">${g.title}</span>
             <div class="muted small">${escapeHtml(g.text)}</div></div></li>`
         )
@@ -1087,7 +1153,7 @@ function renderLessons() {
         <div class="muted small">你的勝率 ${moverWin(r.winBeforeW, me).toFixed(0)}% → ${moverWin(r.winAfterW, me).toFixed(0)}%</div>
         <ul class="why">${reasons.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
         <div class="actions-row">
-          <button class="primary" data-practice="${r.ply}">🧩 自己找找看</button>
+          <button class="primary" data-practice="${r.ply}">自己找找看</button>
           <button data-show="${r.ply}">直接看答案</button>
         </div>
       </article>`;
@@ -1115,11 +1181,11 @@ function renderOpening() {
       html += `<p class="op-summary">${escapeHtml(g.summary)}</p>`;
       if (g.variation) html += `<div class="op-var"><b>${escapeHtml(g.variation.zh)}</b><div>${escapeHtml(g.variation.note)}</div></div>`;
       html += `<div class="actions-row">
-        <button data-op="line">▶ 看主線</button>
-        <button class="primary" data-op="drill">📖 練習這個開局（你執${sideName(me)}）</button></div>`;
+        <button data-op="line">看 Main Line</button>
+        <button class="primary" data-op="drill">練習這個 Opening（你執${sideName(me)}）</button></div>`;
     } else {
       html += `<p class="op-summary muted">這個開局還沒有中文說明，先照下面的開局原則下。</p>
-        <div class="actions-row"><button class="primary" data-op="drill">📖 練習這個開局（你執${sideName(me)}）</button></div>`;
+        <div class="actions-row"><button class="primary" data-op="drill">練習這個 Opening（你執${sideName(me)}）</button></div>`;
     }
     html += '</div>';
   }
@@ -1135,21 +1201,21 @@ function renderOpening() {
   } else {
     const who = leaver.color === me ? '你' : '對手';
     const sameMove = Math.ceil(leaver.ply / 2) === Math.ceil(exit / 2);
-    html += `<p>雙方照常見下法走了 ${exit} 個半步，接著${sameMove ? '' : `第 ${Math.ceil(leaver.ply / 2)} 步`}${who}走 <b>${escapeHtml(moveLabel(leaver))}</b>，離開了常見下法。</p>`;
+    html += `<p>雙方照常見下法走了 ${exit} 個半步，接著${sameMove ? '' : `第 ${Math.ceil(leaver.ply / 2)} 步`}${who}走 <b>${escapeHtml(moveLabel(leaver))}</b>，離開了 Book。</p>`;
     const book = bookMoves(fens[exit]);
     if (book.length) {
-      html += `<div class="muted small">這個局面常見的下法：</div><div class="book-moves">${book
+      html += `<div class="muted small">這個局面的 Book Moves：</div><div class="book-moves">${book
         .slice(0, 6)
         .map((b) => `<span title="${escapeHtml(b.name)}"><b>${escapeHtml(b.san)}</b> ${escapeHtml(b.name.split(':').slice(1).join(':').trim() || b.name)}</span>`)
         .join('')}</div>`;
     }
     if (leaver.color === me && leaver.better && !['best', 'excellent'].includes(leaver.cls)) {
-      html += `<div style="margin-top:8px">${betterHtml(leaver.better, '引擎建議')}</div>`;
+      html += `<div style="margin-top:8px">${betterHtml(leaver.better)}</div>`;
     } else if (leaver.color !== me) {
       const reply = results[exit + 1];
       if (reply) {
         html += `<p style="margin-top:8px">你的回應 <b>${escapeHtml(reply.san)}</b> ${badge(reply.cls)}</p>`;
-        if (reply.better && !['best', 'excellent', 'book'].includes(reply.cls)) html += betterHtml(reply.better, '更好的回應');
+        if (reply.better && !['best', 'excellent', 'book'].includes(reply.cls)) html += betterHtml(reply.better);
         else html += '<p class="muted small">應對得不錯！遇到對手走冷門下法時，照開局原則正常出子就好。</p>';
       }
     }
@@ -1158,13 +1224,13 @@ function renderOpening() {
 
   // 開局階段的失誤：怎麼下才對
   const opMistakes = results.filter((r, i) => r.color === me && phases[i] === 'opening' && BAD.includes(r.cls));
-  html += `<div class="block"><h2>你開局階段的失誤${opMistakes.length ? `（${opMistakes.length}）` : ''}</h2>`;
-  if (!opMistakes.length) html += '<p class="muted">開局階段沒有明顯失誤。</p>';
+  html += `<div class="block"><h2>你在 Opening 的失誤${opMistakes.length ? `（${opMistakes.length}）` : ''}</h2>`;
+  if (!opMistakes.length) html += '<p class="muted">Opening 階段沒有明顯失誤。</p>';
   for (const r of opMistakes) {
     html += `<div class="op-mistake" data-ply="${r.ply}">
       <div><b>${escapeHtml(moveLabel(r))}</b> ${badge(r.cls)}</div>
       ${r.why[0] ? `<div class="small">${escapeHtml(r.why[0])}</div>` : ''}
-      ${r.better ? `<div class="small">👉 應該走 <b>${escapeHtml(r.better.san)}</b>：${escapeHtml(r.better.reasons[0])}</div>` : ''}
+      ${r.better ? `<div class="small">Best Move <b>${escapeHtml(r.better.san)}</b>：${escapeHtml(r.better.reasons[0])}</div>` : ''}
     </div>`;
   }
   html += '</div>';
@@ -1234,7 +1300,7 @@ function renderOpp() {
         verdict =
           reply.loss < 5
             ? '<span class="ok">✓ 你抓住了</span>'
-            : `<span class="bad">✗ 你錯過了</span> <button class="small-btn" data-practice="${reply.ply}">🧩 練習</button>`;
+            : `<span class="bad">✗ 你錯過了</span> <button class="small-btn" data-practice="${reply.ply}">練習</button>`;
       }
       return `<li data-ply="${r.ply}"><b>${escapeHtml(moveLabel(r))}</b> ${badge(r.cls)}
         <span class="muted small">−${r.loss.toFixed(0)}%</span> ${verdict}</li>`;
@@ -1268,9 +1334,9 @@ function buildPgn() {
     if (r.color === 'w') parts.push(`${Math.ceil(r.ply / 2)}.`);
     let comment = `[%eval ${formatScore(evals[i + 1].score).replace('+M', '#').replace('-M', '#-')}]`;
     if (nag[r.cls]) {
-      comment += ` ${CLASSES[r.cls].label}${r.missed ? '（錯失良機）' : ''}。`;
+      comment += ` ${CLASSES[r.cls].label}${r.missed ? '（Miss）' : ''}。`;
       if (r.why[0]) comment += r.why[0];
-      if (r.better) comment += ` 更好：${r.better.text}`;
+      if (r.better) comment += ` Best Move：${r.better.text}`;
     }
     parts.push(`${r.san}${nag[r.cls] || ''} {${comment.replace(/[{}]/g, '')}}`);
   });
@@ -1281,17 +1347,17 @@ function buildPgn() {
 function buildSummary() {
   const s = sideStats(me);
   const lessons = lessonList().map((r, i) => {
-    const why = r.missed ? `錯失良機，${r.why[0] || ''}` : r.why[0] || '';
-    return `${i + 1}. ${moveLabel(r)}（${CLASSES[r.cls].label}）${why} ${r.better ? `→ 更好：${r.better.san}` : ''}`;
+    const why = r.missed ? `Miss，${r.why[0] || ''}` : r.why[0] || '';
+    return `${i + 1}. ${moveLabel(r)}（${CLASSES[r.cls].label}）${why} ${r.better ? `→ Best Move：${r.better.san}` : ''}`;
   });
   const ph = phaseStats(results, phases, me);
   return [
     `♞ ${game.white} vs ${game.black}  ${game.result}`,
     ...(opening.name ? [`開局：${opening.zh || opening.name}（${opening.eco}）`] : []),
     ...buildStory({ results, winW, evals, me, opening, result: game.result }).filter((t) => !t.startsWith('這盤下的是')),
-    ...(ph.weakest ? [`最需要加強：${PHASES[ph.weakest]}（準確率 ${ph.stats[ph.weakest].acc.toFixed(0)}）`] : []),
-    `我（${playerName(me)}，${me === 'w' ? '白' : '黑'}）準確率 ${s.acc?.toFixed(1) ?? '–'}｜不精確 ${s.counts.inaccuracy}、失誤 ${s.counts.mistake}、大失誤 ${s.counts.blunder}、錯失良機 ${s.missed}`,
-    lessons.length ? '本局三課：' : '本局沒有明顯失誤 👍',
+    ...(ph.weakest ? [`最需要加強：${PHASES[ph.weakest]}（Accuracy ${ph.stats[ph.weakest].acc.toFixed(0)}）`] : []),
+    `我（${playerName(me)}，${me === 'w' ? '白' : '黑'}）Accuracy ${s.acc?.toFixed(1) ?? '–'}｜Inaccuracy ${s.counts.inaccuracy}、Mistake ${s.counts.mistake}、Blunder ${s.counts.blunder}、Miss ${s.missed}`,
+    lessons.length ? '本局三課：' : '本局沒有明顯失誤',
     ...lessons,
     game.url,
   ].join('\n');
@@ -1335,6 +1401,7 @@ function nav(dir) {
   }
   if (explore) {
     if (dir === 'prev') undoExplore();
+    if (dir === 'next') redoExplore();
     return;
   }
   select({ first: 0, prev: sel - 1, next: sel + 1, last: moves.length }[dir]);
@@ -1348,18 +1415,28 @@ $('#flip').addEventListener('click', () => {
   flipped = !flipped;
   render();
 });
-$('#replay').addEventListener('click', () => startVariation('replay', sel));
+$('#best-toggle').checked = showBest;
+$('#best-toggle').addEventListener('change', (e) => {
+  showBest = e.target.checked;
+  chrome.storage.sync.set({ reviewBestMove: showBest });
+  render();
+});
 document.addEventListener('keydown', (e) => {
   if (e.target.matches('input, select, textarea')) return;
   if (e.key === 'ArrowLeft') nav('prev');
   if (e.key === 'ArrowRight') nav('next');
+  if (e.key === 'Home') nav('first');
+  if (e.key === 'End') nav('last');
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'sync' && changes.pieceSet) {
-    settings.pieceSet = changes.pieceSet.newValue;
-    render();
+  if (area !== 'sync') return;
+  if (changes.pieceSet) settings.pieceSet = changes.pieceSet.newValue;
+  if (changes.reviewBestMove) {
+    showBest = !!changes.reviewBestMove.newValue;
+    $('#best-toggle').checked = showBest;
   }
+  if (changes.pieceSet || changes.reviewBestMove) render();
 });
 
 function renderAll() {

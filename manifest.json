@@ -34,7 +34,7 @@
   "commands": {
     "toggle-best-move": {
       "suggested_key": { "default": "Alt+B" },
-      "description": "切換最佳著法顯示"
+      "description": "切換 Best Move 顯示"
     }
   },
   "content_security_policy": {

@@ -2,6 +2,7 @@
 export const DEFAULT_SETTINGS = {
   enabled: true,
   showBestMove: false,
+  reviewBestMove: false,
   showArrow: true,
   liveDepth: 16,
   reportDepth: 14,

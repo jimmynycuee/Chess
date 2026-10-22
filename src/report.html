@@ -19,6 +19,8 @@
         <button data-me="w">白方</button>
         <button data-me="b">黑方</button>
       </div>
+      <label class="switch" title="一直顯示 Best Move（會記住）"><input type="checkbox" id="best-toggle"><span class="knob"></span>Best Move</label>
+      <button id="flip" class="ghost" title="翻轉棋盤">翻轉棋盤</button>
       <button id="copy" class="ghost" disabled>複製摘要</button>
       <button id="pgn" class="ghost" disabled>匯出 PGN</button>
     </div>
@@ -43,7 +45,7 @@
       <nav class="tabs" role="tablist">
         <button data-tab="review" class="on">復盤</button>
         <button data-tab="summary">總結</button>
-        <button data-tab="opening">開局</button>
+        <button data-tab="opening">Opening</button>
         <button data-tab="stats">統計</button>
       </nav>
 
@@ -64,7 +66,7 @@
             <div id="story" class="story"></div>
           </section>
           <section class="block">
-            <h2>開局・中局・殘局</h2>
+            <h2>Opening・Middlegame・Endgame</h2>
             <div id="phases" class="phases"></div>
           </section>
           <section class="block">
@@ -98,12 +100,8 @@
       </div>
 
       <footer class="controls">
-        <button data-nav="first" title="開頭">⏮</button>
         <button data-nav="prev" title="上一步（←）">◀</button>
         <button data-nav="next" title="下一步（→）">▶</button>
-        <button data-nav="last" title="最後">⏭</button>
-        <button id="flip" title="翻轉棋盤">⇅</button>
-        <button id="replay" class="primary" title="從目前這一步開始，自己重新下">🔁 從這裡重新下</button>
       </footer>
     </aside>
   </main>

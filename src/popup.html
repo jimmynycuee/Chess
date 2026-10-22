@@ -18,11 +18,12 @@
   <header>♞ Chess Review Buddy</header>
   <section>
     <label>啟用面板 <input type="checkbox" id="enabled"></label>
-    <label>顯示最佳著法 <input type="checkbox" id="showBestMove"></label>
+    <label>即時面板顯示 Best Move <input type="checkbox" id="showBestMove"></label>
+    <label>賽後復盤顯示 Best Move <input type="checkbox" id="reviewBestMove"></label>
     <label>在棋盤上畫箭頭 <input type="checkbox" id="showArrow"></label>
     <label>即時分析深度 <span><input type="range" id="liveDepth" min="10" max="22"> <b id="liveDepthVal"></b></span></label>
-    <label>賽後總結深度 <span><input type="range" id="reportDepth" min="10" max="20"> <b id="reportDepthVal"></b></span></label>
-    <label>賽後總結的棋子 <select id="pieceSet">
+    <label>賽後復盤深度 <span><input type="range" id="reportDepth" min="10" max="20"> <b id="reportDepthVal"></b></span></label>
+    <label>賽後復盤的棋子 <select id="pieceSet">
       <option value="papercut">立體（papercut）</option>
       <option value="spatial">立體（spatial）</option>
       <option value="cburnett">經典平面（cburnett）</option>

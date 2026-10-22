@@ -105,7 +105,7 @@ function nonPawnMaterial(fen) {
   return total;
 }
 
-export const PHASES = { opening: '開局', middlegame: '中局', endgame: '殘局' };
+export const PHASES = { opening: 'Opening', middlegame: 'Middlegame', endgame: 'Endgame' };
 
 // 每一步屬於哪個階段：前 10 步算開局；雙方子力（不含兵與國王）合計 ≤ 13 起算殘局。
 export function phaseOf(results, fens) {
@@ -142,12 +142,12 @@ export function goodMoves({ results, evals, fens, me, oppMistakeLoss }) {
     const prev = results[i - 1];
     const before = moverWin(r.winBeforeW, me);
     if (prev && prev.loss >= oppMistakeLoss && r.loss < 3) {
-      out.push({ ply: r.ply, kind: 'punish', title: '抓住對手的失誤', text: `對手 ${label(prev)} 下錯了，你馬上用 ${r.san} 懲罰他。` });
+      out.push({ ply: r.ply, kind: 'punish', title: 'Punish', text: `對手 ${label(prev)} 下錯了，你馬上用 ${r.san} 懲罰他。` });
       return;
     }
     if (r.uci !== r.bestUci || before > 97 || before < 3) return;
     if (isSacrifice(fens[i], r.uci)) {
-      out.push({ ply: r.ply, kind: 'sac', title: '漂亮的棄子', text: `${r.san} 看起來在送子，其實是引擎認為最好的一步。` });
+      out.push({ ply: r.ply, kind: 'sac', title: 'Sacrifice', text: `${r.san} 看起來在送子，其實是引擎認為最好的一步。` });
       return;
     }
     const second = evals[i].lines?.[1];
@@ -155,7 +155,7 @@ export function goodMoves({ results, evals, fens, me, oppMistakeLoss }) {
     if (second && !recapture) {
       const gap = before - moverWin(whiteWinPercent(second.score), me);
       if (gap >= 20) {
-        out.push({ ply: r.ply, kind: 'only', title: '找到唯一好棋', text: `這裡只有 ${r.san} 能維持局面，第二好的走法勝率會少 ${gap.toFixed(0)}%，你找到了。` });
+        out.push({ ply: r.ply, kind: 'only', title: 'Only Move', text: `這裡只有 ${r.san} 能維持局面，第二好的走法勝率會少 ${gap.toFixed(0)}%，你找到了。` });
       }
     }
   });
@@ -165,14 +165,14 @@ export function goodMoves({ results, evals, fens, me, oppMistakeLoss }) {
 // ---------- 錯誤統計 ----------
 
 export const MISSED_THEMES = {
-  mate: '殺棋',
-  free: '白吃對手的子',
+  mate: 'Checkmate',
+  free: 'Hanging Piece（白吃對手的子）',
   trade: '划算的交換',
-  fork: '捉雙',
-  pin: '牽制／串擊',
-  discovered: '閃擊',
+  fork: 'Fork',
+  pin: 'Pin / Skewer',
+  discovered: 'Discovered Attack',
   win: '贏子的組合',
-  promote: '升變',
+  promote: 'Promotion',
 };
 
 export function mistakeStats(results, me) {
@@ -195,26 +195,26 @@ export function mistakeStats(results, me) {
 const LICHESS = (theme) => `https://lichess.org/training/${theme}`;
 const THEME_LINKS = {
   missed: {
-    mate: ['mateIn2', '殺棋謎題'],
-    free: ['hangingPiece', '吃掉沒保護的子'],
-    trade: ['hangingPiece', '找出划算的吃子'],
-    fork: ['fork', '捉雙謎題'],
-    pin: ['pin', '牽制謎題'],
-    discovered: ['discoveredAttack', '閃擊謎題'],
-    win: ['advantage', '贏得優勢的謎題'],
-    promote: ['promotion', '升變謎題'],
+    mate: ['mateIn2', 'Checkmate 謎題'],
+    free: ['hangingPiece', 'Hanging Piece 謎題'],
+    trade: ['hangingPiece', 'Hanging Piece 謎題'],
+    fork: ['fork', 'Fork 謎題'],
+    pin: ['pin', 'Pin 謎題'],
+    discovered: ['discoveredAttack', 'Discovered Attack 謎題'],
+    win: ['advantage', 'Advantage 謎題'],
+    promote: ['promotion', 'Promotion 謎題'],
   },
   types: {
-    mated: ['defensiveMove', '防守謎題：找出唯一的防守'],
-    hang: ['hangingPiece', '沒保護的子'],
-    fork: ['fork', '捉雙謎題（學會看出對手的捉雙）'],
-    threat: ['defensiveMove', '防守謎題：先看對手的威脅'],
-    material: ['hangingPiece', '沒保護的子'],
+    mated: ['defensiveMove', 'Defensive Move 謎題'],
+    hang: ['hangingPiece', 'Hanging Piece 謎題'],
+    fork: ['fork', 'Fork 謎題（學會看出對手的 Fork）'],
+    threat: ['defensiveMove', 'Defensive Move 謎題'],
+    material: ['hangingPiece', 'Hanging Piece 謎題'],
   },
   phase: {
-    opening: ['opening', '開局階段的謎題'],
-    middlegame: ['middlegame', '中局謎題'],
-    endgame: ['endgame', '殘局謎題'],
+    opening: ['opening', 'Opening 謎題'],
+    middlegame: ['middlegame', 'Middlegame 謎題'],
+    endgame: ['endgame', 'Endgame 謎題'],
   },
 };
 
@@ -228,7 +228,7 @@ export function suggestions({ stats, phase, opening }) {
   };
   for (const m of stats.missed) {
     const [theme, title] = THEME_LINKS.missed[m.key];
-    push(theme, title, `這盤你漏看了 ${m.plies.length} 次${m.name}的機會。`);
+    push(theme, title, `這盤你漏看了 ${m.plies.length} 次 ${m.name} 的機會。`);
   }
   for (const t of stats.types) {
     const link = THEME_LINKS.types[t.key];
@@ -236,7 +236,7 @@ export function suggestions({ stats, phase, opening }) {
   }
   if (phase.weakest) {
     const [theme, title] = THEME_LINKS.phase[phase.weakest];
-    push(theme, title, `你在${PHASES[phase.weakest]}的準確率最低。`);
+    push(theme, title, `你在 ${PHASES[phase.weakest]} 的 Accuracy 最低。`);
   }
   const list = out.slice(0, 3);
   if (opening?.family) {
@@ -303,7 +303,7 @@ export function buildStory({ results, winW, evals, me, opening, result }) {
   }
 
   const missed = results.filter((r) => r.color === me && r.missed).length;
-  if (missed) lines.push(`過程中你有 ${missed} 次錯失良機：對手下錯了，但你沒有抓住。`);
+  if (missed) lines.push(`過程中你有 ${missed} 次 Miss：對手下錯了，但你沒有抓住。`);
 
   const won = (result === '1-0' && me === 'w') || (result === '0-1' && me === 'b');
   const lost = (result === '1-0' && me === 'b') || (result === '0-1' && me === 'w');
@@ -314,8 +314,8 @@ export function buildStory({ results, winW, evals, me, opening, result }) {
     lines.push(`你最好的時候勝率有 ${peak.toFixed(0)}%（第 ${moveNo(peakPly)} 步），可惜沒能把優勢轉成勝利。`);
   }
   const mated = evals[n]?.score.mate === 0;
-  if (won) lines.push(mated ? '最後你將死對手，贏下這盤！' : '最後你贏下這盤！');
-  else if (lost) lines.push(mated ? '最後被對手將死，輸掉這盤。' : '最後輸掉這盤。');
+  if (won) lines.push(mated ? '最後你 Checkmate 對手，贏下這盤！' : '最後你贏下這盤！');
+  else if (lost) lines.push(mated ? '最後被對手 Checkmate，輸掉這盤。' : '最後輸掉這盤。');
   else if (result === '½-½' || result === '1/2-1/2') lines.push('最後以和棋收場。');
   return lines;
 }

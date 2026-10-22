@@ -6,13 +6,13 @@
   const SAN_RE = /^(O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?)[+#]?/;
   const RESULT_RE = /^(1-0|0-1|½-½|1\/2-1\/2)$/;
   const CLASS_INFO = {
-    best: ['最佳', '#5c9e31'],
-    excellent: ['優秀', '#7fa650'],
-    good: ['良好', '#95b776'],
-    book: ['開局', '#a88865'],
-    inaccuracy: ['不精確', '#e6b422'],
-    mistake: ['失誤', '#e58f2a'],
-    blunder: ['大失誤', '#ca3431'],
+    best: ['Best', '#5c9e31'],
+    excellent: ['Excellent', '#7fa650'],
+    good: ['Good', '#95b776'],
+    book: ['Book', '#a88865'],
+    inaccuracy: ['Inaccuracy', '#e6b422'],
+    mistake: ['Mistake', '#e58f2a'],
+    blunder: ['Blunder', '#ca3431'],
   };
 
   let settings = { ...DEFAULTS };
@@ -136,8 +136,8 @@
         </div>
         <div class="crb-last"></div>
         <div class="crb-best"></div>
-        <label class="crb-toggle"><input type="checkbox" class="crb-best-toggle"> 顯示最佳著法 <kbd>Alt+B</kbd></label>
-        <button class="crb-report">📊 賽後總結</button>
+        <label class="crb-toggle"><input type="checkbox" class="crb-best-toggle"> 顯示 Best Move <kbd>Alt+B</kbd></label>
+        <button class="crb-report">賽後復盤</button>
       </div>`;
     panel.style.zoom = settings.panelScale;
     document.body.appendChild(panel);
@@ -246,7 +246,7 @@
       if (settings.showBestMove && r.last.cls !== 'best' && r.last.bestSan) {
         const line3 = document.createElement('div');
         line3.className = 'crb-muted';
-        line3.textContent = `這步更好的是：${r.last.bestSan}${r.last.betterWhy ? `，因為${r.last.betterWhy}` : ''}`;
+        line3.textContent = `這步的 Best Move 是 ${r.last.bestSan}${r.last.betterWhy ? `，因為${r.last.betterWhy}` : ''}`;
         last.append(line3);
       }
     } else {
@@ -257,7 +257,7 @@
     best.hidden = !settings.showBestMove;
     if (settings.showBestMove && r.best) {
       best.innerHTML = '<div class="crb-best-move"></div><ul class="crb-reasons"></ul><div class="crb-pv"></div>';
-      best.querySelector('.crb-best-move').textContent = `最佳著法：${r.best.pvSan[0] || r.best.uci}`;
+      best.querySelector('.crb-best-move').textContent = `Best Move：${r.best.pvSan[0] || r.best.uci}`;
       const ul = best.querySelector('.crb-reasons');
       for (const t of r.best.reasons || []) {
         const li = document.createElement('li');

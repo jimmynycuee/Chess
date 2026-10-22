@@ -30,13 +30,13 @@ export function gameAccuracy(accs) {
 }
 
 export const CLASSES = {
-  best: { label: '最佳', symbol: '★', color: '#5c9e31' },
-  excellent: { label: '優秀', symbol: '!', color: '#7fa650' },
-  good: { label: '良好', symbol: '✓', color: '#95b776' },
-  book: { label: '開局', symbol: '📖', color: '#a88865' },
-  inaccuracy: { label: '不精確', symbol: '?!', color: '#e6b422' },
-  mistake: { label: '失誤', symbol: '?', color: '#e58f2a' },
-  blunder: { label: '大失誤', symbol: '??', color: '#ca3431' },
+  best: { label: 'Best', symbol: '★', color: '#5c9e31' },
+  excellent: { label: 'Excellent', symbol: '!', color: '#7fa650' },
+  good: { label: 'Good', symbol: '✓', color: '#95b776' },
+  book: { label: 'Book', symbol: 'B', color: '#a88865' },
+  inaccuracy: { label: 'Inaccuracy', symbol: '?!', color: '#e6b422' },
+  mistake: { label: 'Mistake', symbol: '?', color: '#e58f2a' },
+  blunder: { label: 'Blunder', symbol: '??', color: '#ca3431' },
 };
 
 // lossPct：走子方勝率損失；isBest：與引擎首選相同。
