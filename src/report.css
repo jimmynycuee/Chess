@@ -460,7 +460,8 @@ select {
   .tab[data-tab="review"]:not([hidden]) { display: flex; flex-direction: column; min-height: 0; flex: 1; }
   .tab[data-tab="review"] .coach { flex: 0 0 auto; max-height: 75%; overflow-y: auto; }
   .tab[data-tab="review"] .chart { flex: 0 0 auto; }
-  .tab[data-tab="review"] .moves { flex: 1 1 0; min-height: 0; overflow-y: auto; align-content: start; }
+  .tab[data-tab="review"] .moves-box { flex: 1 1 0; min-height: 0; overflow-y: auto; }
+  .moves-box > summary { display: none; }
 }
 .phase-label.end { transform: translateX(calc(-100% - 4px)); }
 
@@ -506,3 +507,29 @@ select {
 [data-web] .topbar { padding-top: env(safe-area-inset-top); height: calc(var(--topbar) + env(safe-area-inset-top)); }
 [data-web] .controls { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
 [data-web] #piece-notice { display: none !important; }
+
+/* 著法列表：手機上可以收合 */
+.moves-box > summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border-radius: 8px;
+  list-style: none;
+}
+.moves-box > summary::-webkit-details-marker { display: none; }
+.moves-box > summary::after { content: "展開"; float: right; color: var(--accent); font-size: 13px; }
+.moves-box[open] > summary { margin-bottom: 8px; }
+.moves-box[open] > summary::after { content: "收合"; }
+
+/* 手機：控制列移到棋盤正下方 */
+@media (max-width: 960px) {
+  .board-area > .controls {
+    margin-top: 4px;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+  .board-area > .controls button { padding: 12px 0; }
+  [data-web] .board-area > .controls { padding-bottom: 0; }
+}

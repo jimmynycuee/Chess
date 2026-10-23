@@ -1336,7 +1336,8 @@ function updateCursor() {
   document.querySelectorAll('.mv').forEach((el) => el.classList.toggle('sel', Number(el.dataset.ply) === sel));
   const el = document.querySelector(`.mv[data-ply="${sel}"]`);
   // 寬螢幕時只有著法列表會捲動；窄螢幕時整個面板一起捲
-  const box = $('#moves').scrollHeight > $('#moves').clientHeight ? $('#moves') : $('.tab-body');
+  const mb = $('#moves-box');
+  const box = mb.scrollHeight > mb.clientHeight ? mb : $('.tab-body');
   if (el && tab === 'review' && box.scrollHeight > box.clientHeight) {
     const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top;
     if (top < 0 || top > box.clientHeight - 30) box.scrollTop += top - box.clientHeight / 2;
@@ -1812,7 +1813,23 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.reviewBestMove) render();
 });
 
+// 手機（窄螢幕）：控制列放到棋盤正下方、著法列表預設收合；寬螢幕放回右側面板底部
+const narrow = matchMedia('(max-width: 960px)');
+function placeControls() {
+  const controls = $('.controls');
+  if (narrow.matches) $('.board-area').append(controls);
+  else $('.side').append(controls);
+  $('#moves-box').open = !narrow.matches;
+}
+narrow.addEventListener('change', placeControls);
+placeControls();
+
+function renderMovesSummary() {
+  $('#moves-box > summary').textContent = `著法列表（共 ${Math.ceil(moves.length / 2)} 步）`;
+}
+
 function renderAll() {
+  renderMovesSummary();
   document.querySelectorAll('#me-toggle button').forEach((b) => b.classList.toggle('on', b.dataset.me === me));
   $('#sub').textContent = `${game.result} · ${opening.zh || opening.name || '未知開局'} · ${new Date(game.date).toLocaleString()}`;
   renderCards();
