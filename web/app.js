@@ -137,51 +137,34 @@ async function loadProfile() {
   } else img.hidden = true;
   $('#pf-title').hidden = !p.title;
   $('#pf-title').textContent = p.title || '';
-  $('#pf-real').textContent = p.name || '';
-  $('#pf-real').hidden = !p.name;
-  const meta = [countryName(p.country)];
-  if (p.joined) meta.push(`${new Date(p.joined * 1000).toLocaleDateString('zh-TW', { year: 'numeric', month: 'numeric' })} 加入`);
-  if (p.followers) meta.push(`${p.followers} 位追蹤者`);
-  $('#pf-meta').textContent = meta.filter(Boolean).join('・');
+  // 名字和國家放同一行就好，其他資料（加入時間、追蹤者）省略，畫面比較乾淨
+  $('#pf-meta').textContent = [p.name, countryName(p.country)].filter(Boolean).join('・');
 
+  const rows = RATING_KINDS.filter(([key]) => stats[key]?.last);
   const box = $('#pf-ratings');
   box.innerHTML = '';
-  for (const [key, label] of RATING_KINDS) {
+  for (const [key, label] of rows) {
     const s = stats[key];
-    if (!s?.last) continue;
     const { win = 0, loss = 0, draw = 0 } = s.record || {};
     const total = win + loss + draw;
     const el = document.createElement('div');
-    el.className = 'pf-rating';
+    el.className = 'pf-row';
     el.innerHTML = `
-      <div class="muted small"></div>
-      <div class="pf-elo"></div>
-      <div class="pf-rate"></div>
-      <div class="muted small"></div>
-      <div class="muted small"></div>`;
-    el.children[0].textContent = label;
-    el.children[1].textContent = s.last.rating;
-    el.children[2].textContent = total ? `勝率 ${Math.round((win / total) * 100)}%` : '尚無對局';
-    el.children[3].textContent = `${win}W ${loss}L ${draw}D`;
-    el.children[4].textContent = s.best ? `最高 ${s.best.rating}` : '\u00a0';
+      <div class="pf-cell"><span class="pf-k">ELO</span><b class="pf-v"></b><span class="pf-sub"></span></div>
+      <div class="pf-cell"><span class="pf-k">勝率</span><b class="pf-v accent"></b><span class="pf-sub"></span></div>
+      <div class="pf-cell"><span class="pf-k">戰績</span><b class="pf-v pf-wld"><i class="w"></i> <i class="l"></i> <i class="d"></i></b><span class="pf-sub">W・L・D</span></div>`;
+    const [elo, rate] = el.querySelectorAll('.pf-cell');
+    if (rows.length > 1) elo.querySelector('.pf-k').textContent = `ELO・${label}`;
+    elo.querySelector('.pf-v').textContent = s.last.rating;
+    elo.querySelector('.pf-sub').textContent = s.best ? `最高 ${s.best.rating}` : '';
+    rate.querySelector('.pf-v').textContent = total ? `${Math.round((win / total) * 100)}%` : '—';
+    rate.querySelector('.pf-sub').textContent = `${total} 盤`;
+    el.querySelector('.w').textContent = win;
+    el.querySelector('.l').textContent = loss;
+    el.querySelector('.d').textContent = draw;
     box.append(el);
   }
-  box.hidden = !box.children.length;
-}
-
-// 最近 10 盤的 W / L / D
-function renderForm(games) {
-  const el = $('#pf-form');
-  const last = games.slice(0, 10);
-  el.hidden = !last.length || $('#profile').hidden;
-  el.innerHTML = `<span class="muted small">最近 ${last.length} 盤</span>`;
-  for (const g of last) {
-    const o = outcome(g);
-    const b = document.createElement('span');
-    b.className = `result mini ${o.cls}`;
-    b.textContent = o.text;
-    el.append(b);
-  }
+  box.hidden = !rows.length;
 }
 
 async function load({ autoOpen = true } = {}) {
@@ -202,7 +185,6 @@ async function load({ autoOpen = true } = {}) {
     return;
   }
   renderGames(games);
-  profile.then(() => renderForm(games));
 
   // 從 chess.com App 分享過來的那一盤
   const shared = gameId(params.get('url'));
