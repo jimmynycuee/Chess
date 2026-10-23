@@ -40,7 +40,9 @@ const $ = (sel) => document.querySelector(sel);
 const id = new URLSearchParams(location.search).get('id');
 const stored = (await chrome.storage.local.get(id))[id];
 if (!stored) {
-  $('.progress-text').textContent = '找不到這盤棋的資料，請從 chess.com 頁面重新開啟賽後總結。';
+  // 手機網頁版：資料不在這個儲存空間（例如從主畫面打開），就回到對局列表重新抓
+  if (document.documentElement.dataset.web) location.replace(chrome.runtime.getURL('web/'));
+  else $('.progress-text').textContent = '找不到這盤棋的資料，請從 chess.com 頁面重新開啟賽後總結。';
   throw new Error('no game');
 }
 
