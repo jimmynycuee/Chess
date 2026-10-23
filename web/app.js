@@ -41,11 +41,11 @@ const gameId = (url) => url?.match(/\/game\/(?:live|daily)\/(\d+)/)?.[1] || url?
 
 function outcome(g) {
   const mine = g.white.username.toLowerCase() === user.toLowerCase() ? g.white : g.black;
-  if (mine.result === 'win') return { text: '勝', cls: 'win' };
+  if (mine.result === 'win') return { text: 'W', cls: 'win' };
   if (['agreed', 'repetition', 'stalemate', 'insufficient', '50move', 'timevsinsufficient'].includes(mine.result)) {
-    return { text: '和', cls: 'draw' };
+    return { text: 'D', cls: 'draw' };
   }
-  return { text: '負', cls: 'loss' };
+  return { text: 'L', cls: 'loss' };
 }
 
 const TIME_CLASS = { bullet: 'Bullet', blitz: 'Blitz', rapid: 'Rapid', daily: 'Daily' };
@@ -95,8 +95,100 @@ async function openGame(g) {
   location.href = `../src/report.html?id=${encodeURIComponent(key)}`;
 }
 
+// ---------- 個人資料：頭像、名稱、國家、各時制 Elo 與勝率 ----------
+let regionNames = null;
+try {
+  regionNames = new Intl.DisplayNames(['zh-TW'], { type: 'region' });
+} catch {
+  // 舊瀏覽器就直接顯示國家代碼
+}
+const countryName = (url) => {
+  const code = url?.split('/').pop();
+  if (!code) return '';
+  try {
+    return regionNames?.of(code) || code;
+  } catch {
+    return code; // chess.com 自訂的代碼（例如 XX）
+  }
+};
+
+const RATING_KINDS = [
+  ['chess_rapid', 'Rapid'],
+  ['chess_blitz', 'Blitz'],
+  ['chess_bullet', 'Bullet'],
+  ['chess_daily', 'Daily'],
+];
+
+async function loadProfile() {
+  const u = encodeURIComponent(user);
+  const [p, stats] = await Promise.all([
+    getJson(`${API}/${u}`),
+    getJson(`${API}/${u}/stats`).catch(() => ({})),
+  ]);
+  $('#profile').hidden = false;
+  const name = p.username || user;
+  $('#pf-user').textContent = name;
+  $('#pf-initial').textContent = name[0]?.toUpperCase() || '?';
+  const img = $('#pf-img');
+  if (p.avatar) {
+    img.src = p.avatar;
+    img.hidden = false;
+    img.onerror = () => (img.hidden = true);
+  } else img.hidden = true;
+  $('#pf-title').hidden = !p.title;
+  $('#pf-title').textContent = p.title || '';
+  $('#pf-real').textContent = p.name || '';
+  $('#pf-real').hidden = !p.name;
+  const meta = [countryName(p.country)];
+  if (p.joined) meta.push(`${new Date(p.joined * 1000).toLocaleDateString('zh-TW', { year: 'numeric', month: 'numeric' })} 加入`);
+  if (p.followers) meta.push(`${p.followers} 位追蹤者`);
+  $('#pf-meta').textContent = meta.filter(Boolean).join('・');
+
+  const box = $('#pf-ratings');
+  box.innerHTML = '';
+  for (const [key, label] of RATING_KINDS) {
+    const s = stats[key];
+    if (!s?.last) continue;
+    const { win = 0, loss = 0, draw = 0 } = s.record || {};
+    const total = win + loss + draw;
+    const el = document.createElement('div');
+    el.className = 'pf-rating';
+    el.innerHTML = `
+      <div class="muted small"></div>
+      <div class="pf-elo"></div>
+      <div class="pf-rate"></div>
+      <div class="muted small"></div>
+      <div class="muted small"></div>`;
+    el.children[0].textContent = label;
+    el.children[1].textContent = s.last.rating;
+    el.children[2].textContent = total ? `勝率 ${Math.round((win / total) * 100)}%` : '尚無對局';
+    el.children[3].textContent = `${win}W ${loss}L ${draw}D`;
+    el.children[4].textContent = s.best ? `最高 ${s.best.rating}` : '\u00a0';
+    box.append(el);
+  }
+  box.hidden = !box.children.length;
+}
+
+// 最近 10 盤的 W / L / D
+function renderForm(games) {
+  const el = $('#pf-form');
+  const last = games.slice(0, 10);
+  el.hidden = !last.length || $('#profile').hidden;
+  el.innerHTML = `<span class="muted small">最近 ${last.length} 盤</span>`;
+  for (const g of last) {
+    const o = outcome(g);
+    const b = document.createElement('span');
+    b.className = `result mini ${o.cls}`;
+    b.textContent = o.text;
+    el.append(b);
+  }
+}
+
 async function load({ autoOpen = true } = {}) {
   setStatus('正在讀取你的對局…');
+  const profile = loadProfile().catch(() => {
+    $('#profile').hidden = true; // 個人資料讀不到不影響對局列表
+  });
   let games;
   try {
     games = await recentGames(params.get('url') ? 3 : 2);
@@ -110,6 +202,7 @@ async function load({ autoOpen = true } = {}) {
     return;
   }
   renderGames(games);
+  profile.then(() => renderForm(games));
 
   // 從 chess.com App 分享過來的那一盤
   const shared = gameId(params.get('url'));
@@ -133,6 +226,8 @@ $('#user-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   user = $('#user-input').value.trim();
   if (!user) return;
+  $('#profile').hidden = true;
+  $('#games-section').hidden = true;
   await store.set({ webUser: user });
   $('#user-form').hidden = true;
   $('#change-user').hidden = false;

@@ -26,12 +26,25 @@
       <h1>輸入你的 chess.com 帳號</h1>
       <p class="muted">會記在這支手機上，之後打開就會自動載入你最新下完的那盤。</p>
       <div class="row">
-        <input id="user-input" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="例如 jims_cc" required>
+        <input id="user-input" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="你的 chess.com 帳號" required>
         <button class="primary" type="submit">開始</button>
       </div>
     </form>
 
     <div id="status" class="status" hidden></div>
+
+    <section id="profile" class="card profile" hidden>
+      <div class="pf-head">
+        <div class="pf-avatar"><img id="pf-img" alt="" hidden><span id="pf-initial"></span></div>
+        <div class="pf-id">
+          <div class="pf-name"><span id="pf-title" class="pf-title" hidden></span><b id="pf-user"></b></div>
+          <div id="pf-real" class="muted small"></div>
+          <div id="pf-meta" class="muted small"></div>
+        </div>
+      </div>
+      <div id="pf-ratings" class="pf-ratings"></div>
+      <div id="pf-form" class="pf-form" hidden></div>
+    </section>
 
     <section id="games-section" hidden>
       <div class="section-head">
