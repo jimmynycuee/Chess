@@ -90,6 +90,7 @@ function soundKind(san) {
 function synth(kind) {
   try {
     audioCtx ||= new AudioContext();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     const t = audioCtx.currentTime;
     const freq = { move: 520, capture: 300, castle: 440, check: 760, promote: 660 }[kind];
     for (const [delay, f] of kind === 'castle' ? [[0, freq], [0.09, freq]] : [[0, freq]]) {
@@ -109,20 +110,56 @@ function synth(kind) {
   }
 }
 
+function getAudio(kind) {
+  if (!soundCache[kind]) {
+    const a = new Audio(`${CHESSCOM_SOUNDS}${SOUND_FILES[kind]}.mp3`);
+    a.preload = 'auto';
+    // 只有檔案真的載不到才改用合成音（被瀏覽器暫時擋下播放不算）
+    a.addEventListener('error', () => soundFailed.add(kind));
+    soundCache[kind] = a;
+  }
+  return soundCache[kind];
+}
+
+// iPhone 只允許在手指點按的當下開始播放聲音：第一次點畫面時，把每種音效都靜音播一下再停掉，
+// 之後程式自己播放（播放模式、Show Moves、對手回應）也能出聲。
+let audioUnlocked = false;
+function unlockAudio() {
+  if (audioUnlocked || !settings.soundOn) return;
+  audioUnlocked = true;
+  try {
+    audioCtx ||= new AudioContext();
+    audioCtx.resume();
+  } catch {
+    // 沒有 Web Audio 就只用 <audio>
+  }
+  for (const kind of Object.keys(SOUND_FILES)) {
+    const a = getAudio(kind);
+    a.muted = true;
+    a.play()
+      .then(() => {
+        a.pause();
+        a.currentTime = 0;
+        a.muted = false;
+      })
+      .catch(() => {
+        a.muted = false;
+      });
+  }
+}
+document.addEventListener('pointerdown', unlockAudio, true);
+document.addEventListener('keydown', unlockAudio, true);
+
 function playMoveSound(san) {
   if (!settings.soundOn || !san) return;
   const kind = soundKind(san);
   if (soundFailed.has(kind)) return synth(kind);
-  if (!soundCache[kind]) {
-    const a = new Audio(`${CHESSCOM_SOUNDS}${SOUND_FILES[kind]}.mp3`);
-    a.preload = 'auto';
-    a.addEventListener('error', () => soundFailed.add(kind));
-    soundCache[kind] = a;
-  }
-  const a = soundCache[kind].cloneNode();
+  const a = getAudio(kind);
+  a.muted = false;
   a.volume = 0.8;
-  a.play().catch(() => {
-    soundFailed.add(kind);
+  a.currentTime = 0;
+  a.play().catch((e) => {
+    if (e?.name !== 'NotAllowedError') soundFailed.add(kind);
     synth(kind);
   });
 }
@@ -619,18 +656,18 @@ function betterHtml(better, label = 'Best Move') {
   </div>`;
 }
 
+// Best Move 顯示規則（一般復盤）：
+// - 只顯示「這一步本來該怎麼走」（綠色），不再另外顯示下一步的提示，避免兩種箭頭混在一起
+// - 開關開著就顯示；關著時改成一顆按鈕，想看再點
+// - 播放途中不顯示；停在關鍵時刻一定顯示
+let revealAt = null; // 開關關著時，按了「看這步的 Best Move」的那一步
+
 function renderReview() {
   const played = sel > 0 ? results[sel - 1] : null;
-  // 播放途中不顯示 Best Move（會跟實際下法混在一起），只有停在關鍵時刻才顯示
   const atKey = pausedAt === sel;
-  const showBetter = played && played.better && !['best', 'book'].includes(played.cls) && (!playing || atKey);
-  const nowBest =
-    showBest && !playing && !atKey && evals[sel].bestmove
-      ? explainBest({ fenBefore: fens[sel], before: evals[sel], mover: new Chess(fens[sel]).turn() })
-      : null;
-  let arrow = null;
-  if (!picked && nowBest) arrow = { uci: evals[sel].bestmove, color: '#4a9eff' };
-  else if (!picked && showBetter) arrow = { uci: played.bestUci, color: '#3ba55d' };
+  const hasBetter = !!(played && played.better && !['best', 'book'].includes(played.cls));
+  const showBetter = hasBetter && (atKey || (!playing && (showBest || revealAt === sel)));
+  const arrow = !picked && showBetter ? { uci: played.bestUci, color: '#3ba55d' } : null;
   drawBoard({
     fen: fens[sel],
     highlight: played ? [played.uci.slice(0, 2), played.uci.slice(2, 4)] : [],
@@ -644,10 +681,8 @@ function renderReview() {
     <div class="actions-row"><button class="primary" data-review="replay">${
       replayBase() === sel - 1 ? `重下 ${escapeHtml(moveLabel(results[sel - 1]))}` : '從這裡重新下'
     }</button></div>`;
-  const turn = new Chess(fens[sel]).turn();
-  const bestBlock = nowBest ? bestNowHtml(povBetter(nowBest, turn), `Best Move（輪到${sideName(turn)}）`) : '';
   if (!played) {
-    setCoach('起始局面', `<div class="line">白方勝率 ${winW[0].toFixed(0)}%</div>${bestBlock}${tail}`);
+    setCoach('起始局面', `<div class="line">白方勝率 ${winW[0].toFixed(0)}%</div>${tail}`);
     return;
   }
   const bookName = opening.bookPlies.has(played.ply) ? openingTable[posKey(fens[sel])]?.[1] : null;
@@ -660,7 +695,9 @@ function renderReview() {
   if (played.missed) html += `<div class="line">${missedTag} 對手上一步下錯了，這裡有機會反擊。</div>`;
   if (played.why.length) html += `<ul class="why">${played.why.map((t) => `<li>${escapeHtml(pov(t, played.color))}</li>`).join('')}</ul>`;
   if (showBetter) html += betterHtml(povBetter(played.better, played.color), `這步的 Best Move`);
-  setCoach(`${escapeHtml(moveLabel(played))} ${badge(played.cls)}`, html + bestBlock + tail);
+  else if (hasBetter && !playing) html += '<div class="actions-row"><button data-review="reveal">看這步的 Best Move</button></div>';
+  else if (played.cls === 'best') html += '<div class="muted small">這步就是 Best Move。</div>';
+  setCoach(`${escapeHtml(moveLabel(played))} ${badge(played.cls)}`, html + tail);
 }
 
 // ---------- 練習模式（本局三課） ----------
@@ -1063,6 +1100,10 @@ $('#coach-body').addEventListener('click', (e) => {
   const db = e.target.closest('[data-demo]');
   if (db) return startDemo(db.dataset.demo);
   if (e.target.closest('[data-review="replay"]')) return startReplayHere();
+  if (e.target.closest('[data-review="reveal"]')) {
+    revealAt = sel;
+    return render();
+  }
   const b = e.target.closest('button[data-ex]');
   if (b && explore) {
     const act = b.dataset.ex;
@@ -1347,6 +1388,7 @@ function updateCursor() {
 // animate：前進或後退一步時讓棋子滑動（拖曳走子時已經放好了，就不用再滑）
 function select(ply, animate = true) {
   const target = Math.max(0, Math.min(moves.length, ply));
+  if (target !== sel) revealAt = null;
   if (animate && !practice && !explore && !lineView) {
     if (target === sel + 1) {
       pendingAnim = slidesFor(results[sel].uci);

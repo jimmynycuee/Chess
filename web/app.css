@@ -76,3 +76,5 @@ button.link { background: none; color: var(--accent); font-weight: 700; padding:
 .help ol { padding-left: 20px; }
 .help li { margin: 6px 0; }
 .help code { word-break: break-all; background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+
+html, button, .games li { touch-action: manipulation; }

@@ -533,3 +533,7 @@ select {
   .board-area > .controls button { padding: 12px 0; }
   [data-web] .board-area > .controls { padding-bottom: 0; }
 }
+
+/* 連續點按鈕時不要被 iPhone 當成「雙擊放大」 */
+html, button, .board, .tabs, .controls { touch-action: manipulation; }
+.board { touch-action: none; }
