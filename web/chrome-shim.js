@@ -78,4 +78,32 @@
     },
   };
   document.documentElement.dataset.web = '1';
+
+  // ---------- iPhone：不讓頁面被放大 ----------
+  // Safari 會忽略 user-scalable=no，touch-action 也擋不住所有的「連點放大」，
+  // 所以：連續兩下點得很快時，取消第二下的預設動作（放大），自己補送一次 click。
+  const vp = document.querySelector('meta[name=viewport]');
+  if (vp && !/maximum-scale/.test(vp.content)) vp.content += ', maximum-scale=1, user-scalable=no';
+  for (const type of ['gesturestart', 'gesturechange']) {
+    document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+  }
+  let lastTouchEnd = 0;
+  document.addEventListener(
+    'touchend',
+    (e) => {
+      const now = e.timeStamp;
+      const fast = now - lastTouchEnd < 400;
+      lastTouchEnd = now;
+      if (!fast || e.touches.length || e.changedTouches.length !== 1) return;
+      const t = e.target;
+      // 棋盤自己處理拖曳／點擊；輸入框要讓它正常取得焦點
+      if (t.closest?.('#board, input, textarea, select')) return;
+      e.preventDefault();
+      const p = e.changedTouches[0];
+      t.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: p.clientX, clientY: p.clientY, screenX: p.screenX, screenY: p.screenY }),
+      );
+    },
+    { passive: false },
+  );
 })();
