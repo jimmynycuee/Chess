@@ -143,9 +143,9 @@ select {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 50%;
+  height: var(--w, 50%);
   background: #f0eee9;
-  transition: height 0.35s ease;
+  transition: height 0.35s ease, width 0.35s ease;
 }
 .evalbar.flipped .eval-white { bottom: auto; top: 0; }
 .eval-text {
@@ -157,8 +157,8 @@ select {
   text-align: center;
   line-height: 1;
 }
-.eval-text.on-white { bottom: 6px; color: #403d39; }
-.eval-text.on-black { top: 6px; color: #f0eee9; }
+.eval-text.near { bottom: 6px; }
+.eval-text.far { top: 6px; }
 
 /* ---------- 棋盤 ---------- */
 .board {
@@ -445,7 +445,16 @@ select {
 
 /* ---------- 窄螢幕：上下排列，整頁捲動 ---------- */
 @media (max-width: 960px) {
-  :root { --board: min(calc(100vw - 2 * var(--gap) - var(--evalbar-w) - 8px), 640px); --side-w: 100%; }
+  /* 勝率條改成橫的放在棋盤上方，棋盤可以用滿整個寬度 */
+  :root { --board: min(calc(100vw - 2 * var(--gap)), 640px); --side-w: 100%; }
+  .player { padding-left: 0; }
+  .board-wrap { flex-direction: column; gap: 6px; }
+  .evalbar { width: var(--board); height: 16px; }
+  .eval-white { top: 0; bottom: 0; left: 0; right: auto; height: 100%; width: var(--w, 50%); }
+  .evalbar.flipped .eval-white { left: auto; right: 0; top: 0; }
+  .eval-text { top: 0; bottom: 0; left: auto; right: auto; display: flex; align-items: center; }
+  .eval-text.near { left: 6px; bottom: 0; }
+  .eval-text.far { right: 6px; top: 0; }
   body { overflow: auto; }
   #app { height: auto; grid-template-columns: 1fr; }
   .side { height: auto; }

@@ -535,16 +535,15 @@ function renderEvalBar(score) {
   bar.classList.toggle('flipped', flipped);
   if (!score) return;
   const w = whiteWinPercent(score);
-  bar.querySelector('.eval-white').style.height = `${w}%`;
+  // 直立（電腦）或橫向（手機）都用同一個 --w，方向交給 CSS 決定
+  bar.style.setProperty('--w', `${w}%`);
   const text = bar.querySelector('.eval-text');
   text.textContent = formatScore(score).replace('+', '');
-  // 數字顯示在領先那一方的那一端
+  // 數字顯示在領先那一方的那一端（直立：下／上；橫向：左／右）
   const whiteAhead = w >= 50;
-  const atBottom = whiteAhead !== flipped;
-  text.className = 'eval-text';
+  const near = whiteAhead !== flipped;
+  text.className = `eval-text ${near ? 'near' : 'far'}`;
   text.style.color = whiteAhead ? '#403d39' : '#f0eee9';
-  text.style.top = atBottom ? '' : '6px';
-  text.style.bottom = atBottom ? '6px' : '';
 }
 
 // ---------- 主要繪製：依目前模式畫棋盤與教練框 ----------
