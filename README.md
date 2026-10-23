@@ -31,6 +31,20 @@ chess.com 的 Fair Play 規則禁止在任何真人對局中使用引擎輔助�
   - 棋子：自動使用你在 chess.com 用的棋子樣式（打開 chess.com 任一盤棋時從頁面讀取圖檔網址並下載存在本機，不包含在本專案中）；取得前暫時用 papercut
 - 即時面板在你下錯時也會顯示一句原因
 
+## 手機版（iPhone／Android 網頁）
+
+網址：<https://jimmynycuee.github.io/Chess/>（需先在 GitHub 開啟 Pages，見下方）
+
+- 輸入 chess.com 帳號後，會透過 chess.com 公開 API 列出最近兩個月的對局；有新下完的對局就自動打開分析
+- 用的是跟插件同一套賽後復盤頁（`src/report.html`），`web/chrome-shim.js` 在一般網頁裡提供它需要的 chrome.storage／runtime API（改存在瀏覽器的 localStorage）
+- iPhone：在 Safari 按「分享 → 加入主畫面」就能像 App 一樣使用；用「捷徑」App 可以從 chess.com App 的分享選單直接打開某一盤（步驟寫在首頁下方）
+- 手機上最多同時開 2 個引擎；棋子用 chess.com 的 Neo 圖檔
+- 沒有即時面板（那需要瀏覽器插件）
+
+### 開啟 GitHub Pages
+
+repo 的 Settings → Pages → Build and deployment：Source 選「Deploy from a branch」，Branch 選 `claude/ecstatic-gates-te2r0i`、資料夾選 `/ (root)`，按 Save。一兩分鐘後就能用上面的網址打開。
+
 ## 安裝（開發者模式）
 
 1. 下載這個 repo
@@ -55,6 +69,8 @@ src/
   popup.html / .js           設定（深度、開關）
 pieces/                      棋子圖（papercut、spatial、cburnett，授權見 pieces/LICENSES.md）
 tools/build-openings.mjs     由 lichess-org/chess-openings 產生 vendor/openings.json
+web/                         手機網頁版：對局列表（index.html、app.js）與 chrome API 相容層（chrome-shim.js）
+index.html                   GitHub Pages 首頁，轉到 web/
 vendor/
   stockfish.js / .wasm       Stockfish 17.1 lite single-thread（GPLv3）
   chess.js                   chess.js 1.4.0（BSD-2）

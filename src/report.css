@@ -498,3 +498,11 @@ select {
   0%, 100% { box-shadow: 0 2px 0 #2f6fc0, 0 0 0 0 rgba(74, 158, 255, 0.6); }
   50% { box-shadow: 0 2px 0 #2f6fc0, 0 0 0 6px rgba(74, 158, 255, 0); }
 }
+
+/* 網頁版（手機）：回到對局列表的連結；iPhone 瀏海與底部安全區 */
+.web-only { display: none; }
+[data-web] .web-only { display: inline-flex; }
+.back-link { color: var(--accent); font-weight: 800; text-decoration: none; white-space: nowrap; }
+[data-web] .topbar { padding-top: env(safe-area-inset-top); height: calc(var(--topbar) + env(safe-area-inset-top)); }
+[data-web] .controls { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+[data-web] #piece-notice { display: none !important; }

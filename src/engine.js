@@ -96,8 +96,10 @@ export class Engine {
 }
 
 // 同時開幾個引擎：留一個核心給瀏覽器，最多 4 個。
+// 手機記憶體較少，最多 2 個，避免瀏覽器把頁面重新載入。
 export function poolSize() {
-  return Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1));
+  const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  return Math.max(1, Math.min(mobile ? 2 : 4, (navigator.hardwareConcurrency || 2) - 1));
 }
 
 // 用多個引擎平行分析一串局面，結果照原本的順序排好。

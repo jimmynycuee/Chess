@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>賽後復盤</title>
+<meta name="description" content="chess.com 對局的賽後復盤：勝率變化、Best Move 與說明、Show Moves、重新下、Opening 教學。">
+<meta name="theme-color" content="#262421">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="賽後復盤">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="app.css">
+<script src="chrome-shim.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">♞ 賽後復盤</div>
+    <button id="change-user" class="link" hidden>換帳號</button>
+  </header>
+
+  <main>
+    <form id="user-form" class="card" hidden>
+      <h1>輸入你的 chess.com 帳號</h1>
+      <p class="muted">會記在這支手機上，之後打開就會自動載入你最新下完的那盤。</p>
+      <div class="row">
+        <input id="user-input" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="例如 jims_cc" required>
+        <button class="primary" type="submit">開始</button>
+      </div>
+    </form>
+
+    <div id="status" class="status" hidden></div>
+
+    <section id="games-section" hidden>
+      <div class="section-head">
+        <h2>最近的對局</h2>
+        <button id="refresh" class="link">重新整理</button>
+      </div>
+      <ul id="games" class="games"></ul>
+    </section>
+
+    <details class="card help">
+      <summary>從 chess.com App 直接分享到這裡（iPhone 捷徑）</summary>
+      <ol>
+        <li>打開 iPhone 內建的「捷徑」App，點右上角「＋」新增捷徑。</li>
+        <li>點下方的「i」（詳細資訊），打開「在分享表單中顯示」，類型只留「URL」。</li>
+        <li>新增動作「URL」，內容填：<code id="shortcut-url"></code>，最後面接上「捷徑輸入」。</li>
+        <li>再新增動作「打開 URL」。把捷徑命名為「賽後復盤」。</li>
+        <li>之後在 chess.com App 的對局畫面按「分享」，選「賽後復盤」，就會直接打開那盤棋的分析。</li>
+      </ol>
+      <p class="muted">把這個網頁加入主畫面：在 Safari 按「分享」→「加入主畫面」。</p>
+    </details>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
