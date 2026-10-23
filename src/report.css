@@ -513,7 +513,17 @@ select {
 .web-only { display: none; }
 [data-web] .web-only { display: inline-flex; }
 .back-link { color: var(--accent); font-weight: 800; text-decoration: none; white-space: nowrap; }
-[data-web] .topbar { padding-top: env(safe-area-inset-top); height: calc(var(--topbar) + env(safe-area-inset-top)); }
+[data-web] .topbar {
+  padding-top: env(safe-area-inset-top);
+  padding-left: calc(var(--gap) + env(safe-area-inset-left));
+  padding-right: calc(var(--gap) + env(safe-area-inset-right));
+  height: calc(var(--topbar) + env(safe-area-inset-top));
+}
+/* 手機整頁捲動時，標題列固定在最上面，狀態列底下一直是同一個顏色（不會出現模糊色帶） */
+@media (max-width: 960px) {
+  [data-web] .topbar { position: sticky; top: 0; z-index: 20; }
+}
+html { background: var(--panel-2); }
 [data-web] .controls { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
 [data-web] #piece-notice { display: none !important; }
 

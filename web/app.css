@@ -1,5 +1,6 @@
 :root {
   color-scheme: dark;
+  background: #1f1d1b;
   --bg: #312e2b;
   --panel: #262421;
   --panel-2: #1f1d1b;
@@ -18,13 +19,19 @@ body {
   background: var(--bg);
   color: var(--fg);
   font: 15px/1.5 system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  /* 標題列一路延伸到狀態列底下，並固定在最上面：狀態列下面永遠是同一個顏色，
+     iPhone 的模糊效果就不會把底下捲動的內容混出色帶 */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 calc(-1 * env(safe-area-inset-right)) 0 calc(-1 * env(safe-area-inset-left));
+  padding: calc(14px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 14px calc(16px + env(safe-area-inset-left));
   background: var(--panel-2);
   border-bottom: 1px solid var(--line);
 }
