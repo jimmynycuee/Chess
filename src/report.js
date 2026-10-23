@@ -666,7 +666,8 @@ function renderReview() {
   const atKey = pausedAt === sel;
   const hasBetter = !!(played && played.better && !['best', 'book'].includes(played.cls));
   const showBetter = hasBetter && (atKey || (!playing && (showBest || revealAt === sel)));
-  const arrow = !picked && showBetter ? { uci: played.bestUci, color: '#3ba55d' } : null;
+  // 選取棋子時也保留 Best Move 箭頭（之前會被藏起來，看起來像 Best Move 消失）
+  const arrow = showBetter ? { uci: played.bestUci, color: '#3ba55d' } : null;
   drawBoard({
     fen: fens[sel],
     highlight: played ? [played.uci.slice(0, 2), played.uci.slice(2, 4)] : [],
@@ -1035,7 +1036,7 @@ function renderExplore() {
     highlight: last ? [last.uci.slice(0, 2), last.uci.slice(2, 4)] : [],
     selected: picked,
     targets: targetsOf(fen),
-    arrow: !picked && best?.uci ? { uci: best.uci, color: '#4a9eff' } : null,
+    arrow: best?.uci ? { uci: best.uci, color: '#4a9eff' } : null,
   });
   if (nowEval) renderEvalBar(nowEval.score);
 
@@ -1221,7 +1222,19 @@ function tryMove(from, to) {
 
 let drag = null;
 
+// 拖曳用的「浮起來的棋子」是放在 body 上的；萬一沒收到放開的事件（多指觸控、iPhone 手勢被系統中斷），
+// 它就會留在畫面上變成殘影。所以每次開始新的拖曳、或拖曳中斷時，都把它清掉。
+function clearGhosts() {
+  for (const g of document.querySelectorAll('.pc-ghost')) g.remove();
+}
+
 $('#board').addEventListener('pointerdown', (e) => {
+  if (drag) {
+    // 上一次的拖曳還沒結束（例如第二根手指碰到棋盤）：先收掉，不要疊出第二個殘影
+    if (drag.ghost) return;
+    drag = null;
+  }
+  clearGhosts();
   const fen = boardFen();
   const cell = e.target.closest('[data-sq]');
   if (!fen || !cell || e.button !== 0) return;
@@ -1242,15 +1255,19 @@ $('#board').addEventListener('pointerdown', (e) => {
     ghost.style.top = `${e.clientY - rect.height / 2}px`;
     document.body.append(ghost);
     img.classList.add('lifted');
-    drag = { from: sq, ghost, size: rect.width, wasPicked, x0: e.clientX, y0: e.clientY, moved: false };
-    $('#board').setPointerCapture(e.pointerId);
+    drag = { from: sq, ghost, size: rect.width, wasPicked, x0: e.clientX, y0: e.clientY, moved: false, pointerId: e.pointerId };
+    try {
+      $('#board').setPointerCapture(e.pointerId);
+    } catch {
+      // 指標已經不在了（很快就放開）：靠 window 的 pointerup 收尾
+    }
   } else if (picked) {
-    drag = { target: sq };
+    drag = { target: sq, pointerId: e.pointerId };
   }
 });
 
 $('#board').addEventListener('pointermove', (e) => {
-  if (!drag?.ghost) return;
+  if (!drag?.ghost || e.pointerId !== drag.pointerId) return;
   drag.ghost.style.left = `${e.clientX - drag.size / 2}px`;
   drag.ghost.style.top = `${e.clientY - drag.size / 2}px`;
   if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 4) drag.moved = true;
@@ -1258,10 +1275,11 @@ $('#board').addEventListener('pointermove', (e) => {
 
 function endDrag(e, cancelled = false) {
   if (!drag) return;
+  if (e?.pointerId != null && drag.pointerId != null && e.pointerId !== drag.pointerId) return; // 別根手指放開不算
   const d = drag;
   drag = null;
+  clearGhosts();
   if (d.ghost) {
-    d.ghost.remove();
     const to = cancelled ? null : document.elementFromPoint(e.clientX, e.clientY)?.closest('#board [data-sq]')?.dataset.sq;
     if (to && to !== d.from && tryMove(d.from, to)) return;
     // 拖到不合法的格子就放回原位；原地第二次點同一個子則取消選取
@@ -1275,6 +1293,11 @@ function endDrag(e, cancelled = false) {
 }
 $('#board').addEventListener('pointerup', (e) => endDrag(e));
 $('#board').addEventListener('pointercancel', (e) => endDrag(e, true));
+// 放開的事件沒送到棋盤（手指滑出去、被系統手勢打斷、切到別的 App）時也要收尾
+$('#board').addEventListener('lostpointercapture', (e) => drag?.ghost && endDrag(e, true));
+window.addEventListener('pointerup', (e) => drag && endDrag(e));
+window.addEventListener('blur', () => drag && endDrag(null, true));
+document.addEventListener('visibilitychange', () => document.hidden && drag && endDrag(null, true));
 
 // ---------- 走勢圖與著法列表（復盤分頁） ----------
 
