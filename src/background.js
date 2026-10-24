@@ -3,21 +3,39 @@ import { loadSettings } from './settings.js';
 const OFFSCREEN_URL = 'src/offscreen.html';
 let creating = null;
 
-async function ensureOffscreen() {
+async function hasOffscreen() {
   const contexts = await chrome.runtime.getContexts({
     contextTypes: ['OFFSCREEN_DOCUMENT'],
     documentUrls: [chrome.runtime.getURL(OFFSCREEN_URL)],
   });
-  if (contexts.length) return;
-  if (!creating) {
-    creating = chrome.offscreen
-      .createDocument({
+  return contexts.length > 0;
+}
+
+// 建立背景引擎頁。電腦睡眠醒來、瀏覽器剛啟動時，Chrome／Brave 偶爾會回「Page failed to load」，
+// 這時先把殘留的頁面關掉，稍等一下再試，不要直接把錯誤丟給面板。
+async function createOffscreen() {
+  let lastError;
+  for (const wait of [0, 300, 1000, 2500]) {
+    if (wait) await new Promise((r) => setTimeout(r, wait));
+    try {
+      if (await hasOffscreen()) return;
+      await chrome.offscreen.createDocument({
         url: OFFSCREEN_URL,
         reasons: ['WORKERS'],
         justification: '在背景執行 Stockfish 引擎分析棋局',
-      })
-      .finally(() => (creating = null));
+      });
+      return;
+    } catch (e) {
+      lastError = e;
+      await chrome.offscreen.closeDocument().catch(() => {});
+    }
   }
+  throw lastError;
+}
+
+async function ensureOffscreen() {
+  if (await hasOffscreen()) return;
+  creating ||= createOffscreen().finally(() => (creating = null));
   await creating;
 }
 
